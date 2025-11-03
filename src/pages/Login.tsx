@@ -11,7 +11,7 @@ export default function Login() {
   const users = [
     { id: "admin", password: "P@ssw0rd@10", role: "Admin" },
     { id: "Praveen", password: "Praveen12#", role: "Admin" },
-    { id: "aditya", password: "Adi@123", role: "Staff" },
+    { id: "aditya", password: "Adi@123", role: "Admin" },
     { id: "akash", password: "Akash@123", role: "Staff" },
   ];
 

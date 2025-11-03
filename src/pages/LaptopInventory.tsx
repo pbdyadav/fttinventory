@@ -73,7 +73,7 @@ export default function LaptopInventory() {
 
         const { error } = await supabase.from("transfers").insert({
           laptop_id: laptop.id,
-          transfer_type: "retail",
+          transfer_type: "retail", // ✅ lowercase value to match DB check
           to_location: "FTT Retail",
           from_location: laptop.current_location || "Main Warehouse",
           transfer_date: new Date().toISOString(),
@@ -85,8 +85,16 @@ export default function LaptopInventory() {
         return;
       }
 
-      // --- For other transfer types, open form with laptop ID
-      navigate(`/transfer/${laptop.id}`, { state: { type } });
+      // --- ✅ Normalize transfer type before navigating
+      const normalizedType =
+        type === "Godown Sale"
+          ? "godown"
+          : type === "Purchase Return to Dealer"
+          ? "purchase_return"
+          : type.toLowerCase();
+
+      // --- Pass both display and normalized values to the transfer form
+      navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
     } catch (err: any) {
       toast.error("Error transferring: " + err.message);
       console.error(err);

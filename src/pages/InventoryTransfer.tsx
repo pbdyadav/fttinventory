@@ -65,7 +65,7 @@ export default function InventoryTransfer() {
       const { error } = await supabase.from("transfers").insert([
         {
           laptop_id: laptop.id,
-          transfer_type: transferType.toLowerCase(),
+          transfer_type: state?.normalizedType || transferType.toLowerCase(),
           to_location: transferType,
           from_location: "Main Warehouse",
           person_name: form.person_name,
