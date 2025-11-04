@@ -340,7 +340,7 @@ doc.text(`Tested By: ${testerName}`, 120, 45);
                 <td className="p-3">{r.cpu}</td>
                 <td className="p-3">{r.ram}</td>
                 <td className="p-3">{r.ssdHdd}</td>
-                <td className="p-3">{r.tested_by}</td>
+                <td className="p-3">{r.tested_by || "—"}</td>
                 <td className="p-3">{new Date(r.created_at).toLocaleDateString()}</td>
                 <td className="p-3 text-center flex justify-center gap-2">
                   {(isAdmin || r.tested_by === user.id) && (

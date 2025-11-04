@@ -118,7 +118,14 @@ const LaptopTest = () => {
     }
 
     // ✅ Save Laptop Test
-    const { error: testError } = await supabase.from("laptop_tests").insert([data]);
+    // ✅ Include tested_by and tested_on fields
+const { error: testError } = await supabase.from("laptop_tests").insert([
+  {
+    ...data,
+    tested_by: testedBy || "Unknown Tester",
+    tested_on: new Date().toISOString(),
+  },
+]);
     if (testError) throw testError;
 
     // ✅ Auto-add to Inventory (if not exists)
