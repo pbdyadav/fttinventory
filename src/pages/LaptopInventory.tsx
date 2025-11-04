@@ -50,56 +50,78 @@ export default function LaptopInventory() {
     setLoading(false);
   };
 
-  // ✅ Handle transfer
   const handleTransfer = async (laptop: any, type: string) => {
-    if (!type) return;
+  if (!type) return;
 
-    try {
-      // --- Instant transfer for FTT Retail
-      if (type === "FTT Retail") {
-        const { data: existing, error: checkError } = await supabase
-          .from("transfers")
-          .select("id")
-          .eq("laptop_id", laptop.id)
-          .eq("to_location", "FTT Retail")
-          .limit(1);
+  // 🔒 Step 1: Prevent transfer if laptop is not in Main Warehouse
+  if (laptop.current_location !== "Main Warehouse" && type !== "Return to Warehouse") {
+    toast.error(
+      `❌ ${laptop.serialNo} is currently at ${laptop.current_location}. It must return to Main Warehouse before transferring again.`
+    );
+    return;
+  }
 
-        if (checkError) throw checkError;
+  try {
+    // ✅ Instant transfer for FTT Retail
+    if (type === "FTT Retail") {
+      const { data: existing, error: checkError } = await supabase
+        .from("transfers")
+        .select("id")
+        .eq("laptop_id", laptop.id)
+        .eq("to_location", "FTT Retail")
+        .limit(1);
 
-        if (existing && existing.length > 0) {
-          toast.error(`⚠️ ${laptop.serialNo} already transferred to FTT Retail.`);
-          return;
-        }
+      if (checkError) throw checkError;
 
-        const { error } = await supabase.from("transfers").insert({
-          laptop_id: laptop.id,
-          transfer_type: "retail", // ✅ lowercase value to match DB check
-          to_location: "FTT Retail",
-          from_location: laptop.current_location || "Main Warehouse",
-          transfer_date: new Date().toISOString(),
-        });
-
-        if (error) throw error;
-        toast.success(`${laptop.serialNo} transferred to FTT Retail ✅`);
-        fetchLaptops();
+      if (existing && existing.length > 0) {
+        toast.error(`⚠️ ${laptop.serialNo} already transferred to FTT Retail.`);
         return;
       }
 
-      // --- ✅ Normalize transfer type before navigating
-      const normalizedType =
-        type === "Godown Sale"
-          ? "godown"
-          : type === "Purchase Return to Dealer"
-          ? "purchase_return"
-          : type.toLowerCase();
+      const { error } = await supabase.from("transfers").insert({
+        laptop_id: laptop.id,
+        transfer_type: "retail",
+        to_location: "FTT Retail",
+        from_location: laptop.current_location || "Main Warehouse",
+        transfer_date: new Date().toISOString(),
+      });
 
-      // --- Pass both display and normalized values to the transfer form
-      navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
-    } catch (err: any) {
-      toast.error("Error transferring: " + err.message);
-      console.error(err);
+      if (error) throw error;
+      toast.success(`${laptop.serialNo} transferred to FTT Retail ✅`);
+      fetchLaptops();
+      return;
     }
-  };
+
+    // ✅ Allow "Return to Warehouse" from other locations
+    if (type === "Return to Warehouse") {
+      const { error } = await supabase.from("transfers").insert({
+        laptop_id: laptop.id,
+        transfer_type: "warehouse",
+        to_location: "Main Warehouse",
+        from_location: laptop.current_location,
+        transfer_date: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+      toast.success(`${laptop.serialNo} returned to Main Warehouse ✅`);
+      fetchLaptops();
+      return;
+    }
+
+    // ✅ For other transfer types, open transfer form
+    const normalizedType =
+      type === "Godown Sale"
+        ? "godown"
+        : type === "Purchase Return to Dealer"
+        ? "purchase_return"
+        : type.toLowerCase();
+
+    navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
+  } catch (err: any) {
+    toast.error("Error transferring: " + err.message);
+    console.error(err);
+  }
+};
 
   if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
 
@@ -147,9 +169,8 @@ export default function LaptopInventory() {
                     <option value="">Transfer...</option>
                     <option value="FTT Retail">FTT Retail</option>
                     <option value="Godown Sale">Godown Sale</option>
-                    <option value="Purchase Return to Dealer">
-                      Purchase Return to Dealer
-                    </option>
+                    <option value="Purchase Return to Dealer">Purchase Return to Dealer</option>
+                    <option value="Return to Warehouse">Return to Warehouse</option>
                   </select>
                 </td>
               </tr>

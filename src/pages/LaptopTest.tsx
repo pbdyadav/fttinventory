@@ -217,6 +217,7 @@ const LaptopTest = () => {
             <option>Win-11 Home</option>
             <option>Win-11 Pro</option>
             <option>Mac OS</option>
+            <option>Ubuntu</option>
           </select>
           <select {...register("cpu")} className="w-full border p-2 rounded">
             <option value="">Select CPU</option>
@@ -246,8 +247,12 @@ const LaptopTest = () => {
           <select {...register("ram", { required: true })} className="w-full border p-2 rounded">
             <option value="">Select RAM</option>
             <option>8 GB</option>
+            <option>10 GB</option>
+            <option>12 GB</option>
             <option>16 GB</option>
+            <option>20 GB</option>
             <option>32 GB</option>
+            <option>40 GB</option>
             <option>64 GB</option>
             <option>128 GB</option>
           </select>
@@ -257,6 +262,9 @@ const LaptopTest = () => {
             <option>256GB SSD</option>
             <option>512GB SSD</option>
             <option>1TB SSD</option>
+            <option>128GB SSD + 500GB HDD</option>
+            <option>128GB SSD + 1TB HDD</option>
+            <option>256GB SSD + 500GB HDD</option>
             <option>256GB SSD + 1TB HDD</option>
           </select>
           <input {...register("ssdHealth")} placeholder="SSD Health %" className="w-full border p-2 rounded" />

@@ -16,7 +16,7 @@ export default function Navbar() {
         <Link to="/dashboard">Dashboard</Link>
         <Link to="/laptop-test">Laptop Test</Link> {/* ✅ Added correctly */}
         <Link to="/laptop-inventory">Laptop Inventory</Link>
-        <Link to="/transfer">Transfers</Link>
+        {/* <Link to="/transfer">Transfers</Link> */}
         <Link to="/reports">Reports</Link>
         {/* <Link to="/settings">Settings</Link>*/}
         
