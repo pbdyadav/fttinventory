@@ -25,49 +25,64 @@ export default function Reports() {
     user.email === "praveenyadav4u@gmail.com" ||
     user.email === "fttpvtltd@gmail.com";
 
+  // ✅ Load Profiles + Reports once
   useEffect(() => {
-    fetchProfiles();
-    fetchReports();
-  }, []);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // 1️⃣ Load profiles
+        const { data: profileData, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, full_name, email");
+        if (pErr) {
+          console.error("Profile fetch error:", pErr);
+          toast.error("Error loading profiles");
+        } else {
+          const map: Record<string, any> = {};
+          (profileData || []).forEach((p) => (map[p.id] = p));
+          setProfiles(map);
+        }
 
-  // ✅ Load profiles for name mapping
-  const fetchProfiles = async () => {
-    const { data, error } = await supabase.from("profiles").select("id, display_name, email");
-    if (!error && data) {
-      const map: Record<string, any> = {};
-      data.forEach((p) => (map[p.id] = p));
-      setProfiles(map);
-    }
-  };
+        // 2️⃣ Load reports
+        let query = supabase
+          .from("laptop_tests")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-  const fetchReports = async () => {
-    setLoading(true);
-    let query = supabase
-      .from("laptop_tests")
-      .select("*")
-      .order("created_at", { ascending: false });
+        if (role === "Staff" && user?.id) {
+          query = query.eq("tested_by", user.id);
+        }
 
-    if (role === "Staff" && user?.id) {
-      query = query.eq("tested_by", user.id);
-    }
+        const { data: reportData, error: rErr } = await query;
+        if (rErr) {
+          console.error("Reports fetch error:", rErr);
+          toast.error("Error loading reports");
+        } else {
+          setReports(reportData || []);
+        }
+      } catch (err) {
+        console.error("Unexpected error loading data:", err);
+        toast.error("Failed to load reports");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const { data, error } = await query;
-    if (error) toast.error("Error loading reports: " + error.message);
-    setReports(data || []);
-    setLoading(false);
-  };
+    loadData();
+  }, [user?.id, role]); // Runs only when user changes
 
+  // ✅ Toggle selection for checkboxes
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
-  // ✅ Get readable name
+  // ✅ Get readable tester name
   const getTesterName = (tested_by: string) => {
     if (!tested_by) return "Unknown Tester";
     const profile = profiles[tested_by];
-    return profile?.display_name || profile?.email || "Unknown Tester";
+    return profile?.full_name || profile?.email || "Unknown Tester";
   };
 
   // ✅ Generate formatted PDF
@@ -76,9 +91,7 @@ export default function Reports() {
 
     try {
       doc.addImage(FTTLogo, "PNG", 15, 10, 25, 25);
-    } catch (err) {
-      console.warn("Logo load error:", err);
-    }
+    } catch {}
 
     doc.setFontSize(16);
     doc.text("Furtherance Technotree Pvt Ltd, Indore", 45, 20);
@@ -129,6 +142,7 @@ export default function Reports() {
     doc.save(`FTT_Laptop_Report_${test.serialNo || "N/A"}.pdf`);
   };
 
+  // ✅ QR Sticker Printing
   const printQRSticker = (selectedTests: any[]) => {
     if (!selectedTests.length) {
       toast.error("No reports selected for QR printing.");
@@ -136,7 +150,6 @@ export default function Reports() {
     }
 
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
     const marginX = 8,
       marginY = 10,
       stickerWidth = 48,
@@ -162,6 +175,7 @@ export default function Reports() {
           testedDate: new Date(test.created_at).toLocaleDateString(),
         })
       );
+
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
       const qrSize = 24,
         qrX = x + (stickerWidth - qrSize) / 2,
@@ -171,14 +185,7 @@ export default function Reports() {
 
       try {
         const logoSize = 7;
-        doc.addImage(
-          FTTLogo,
-          "PNG",
-          qrX + (qrSize - logoSize) / 2,
-          qrY + (qrSize - logoSize) / 2,
-          logoSize,
-          logoSize
-        );
+        doc.addImage(FTTLogo, "PNG", qrX + 8, qrY + 8, logoSize, logoSize);
       } catch {}
 
       doc.setFont("helvetica", "bold");
@@ -205,6 +212,7 @@ export default function Reports() {
     if (printWin) printWin.onload = () => printWin.print();
   };
 
+  // ✅ Export All to Excel
   const exportToExcel = async () => {
     if (!reports.length) return toast.error("No data to export.");
 
@@ -251,7 +259,8 @@ export default function Reports() {
     toast.success("✅ Excel exported successfully!");
   };
 
-  if (loading) return <p className="p-6 text-gray-500">Loading reports...</p>;
+  if (loading)
+    return <p className="p-6 text-gray-500">Loading reports...</p>;
 
   const selectedReports = reports.filter((r) => selected.includes(r.id));
 

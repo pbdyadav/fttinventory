@@ -21,7 +21,8 @@ import Navbar from "@/components/Navbar";
 // ✅ Protected Route Wrapper
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const isLoggedIn = localStorage.getItem("isLoggedIn");
-  return isLoggedIn ? children : <Navigate to="/login" replace />;
+  const user = localStorage.getItem("user");
+  return isLoggedIn && user ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {

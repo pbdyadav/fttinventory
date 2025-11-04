@@ -122,7 +122,7 @@ const LaptopTest = () => {
 const { error: testError } = await supabase.from("laptop_tests").insert([
   {
     ...data,
-    tested_by: testedBy || "Unknown Tester",
+    tested_by: user?.id, // ✅ Save UUID instead of email or name
     tested_on: new Date().toISOString(),
   },
 ]);
