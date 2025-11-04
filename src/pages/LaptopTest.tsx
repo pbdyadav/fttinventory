@@ -269,6 +269,9 @@ const { error: testError } = await supabase.from("laptop_tests").insert([
             <option>256GB SSD</option>
             <option>512GB SSD</option>
             <option>1TB SSD</option>
+            <option>2TB SSD</option>
+            <option>4TB SSD</option>
+            <option>8TB SSD</option>
             <option>128GB SSD + 500GB HDD</option>
             <option>128GB SSD + 1TB HDD</option>
             <option>256GB SSD + 500GB HDD</option>
