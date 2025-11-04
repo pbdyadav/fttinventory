@@ -12,6 +12,7 @@ export default function Reports() {
   const [reports, setReports] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profiles, setProfiles] = useState<Record<string, any>>({});
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -19,13 +20,32 @@ export default function Reports() {
   const isAdmin = role === "Admin";
   const isAuthor = role === "Staff";
 
+  // ✅ allowed Excel users
+  const canExport =
+    user.email === "praveenyadav4u@gmail.com" ||
+    user.email === "fttpvtltd@gmail.com";
+
   useEffect(() => {
+    fetchProfiles();
     fetchReports();
   }, []);
 
+  // ✅ Load profiles for name mapping
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase.from("profiles").select("id, display_name, email");
+    if (!error && data) {
+      const map: Record<string, any> = {};
+      data.forEach((p) => (map[p.id] = p));
+      setProfiles(map);
+    }
+  };
+
   const fetchReports = async () => {
     setLoading(true);
-    let query = supabase.from("laptop_tests").select("*").order("created_at", { ascending: false });
+    let query = supabase
+      .from("laptop_tests")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (role === "Staff" && user?.id) {
       query = query.eq("tested_by", user.id);
@@ -37,237 +57,199 @@ export default function Reports() {
     setLoading(false);
   };
 
-  // ✅ Handle checkbox toggle
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
-  // ✅ Generate formatted PDF with Logo + QR + Proper Capitalization
-const generatePDF = (test: any) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  // ✅ Get readable name
+  const getTesterName = (tested_by: string) => {
+    if (!tested_by) return "Unknown Tester";
+    const profile = profiles[tested_by];
+    return profile?.display_name || profile?.email || "Unknown Tester";
+  };
 
-  // --- Logo ---
-  try {
-    doc.addImage(FTTLogo, "PNG", 15, 10, 25, 25);
-  } catch (err) {
-    console.warn("Logo load error:", err);
-  }
+  // ✅ Generate formatted PDF
+  const generatePDF = (test: any) => {
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // --- Header text ---
-doc.setFontSize(16);
-doc.text("Furtherance Technotree Pvt Ltd, Indore", 45, 20);
-doc.setFontSize(12);
-doc.text("Laptop Full Diagnostic Report", 45, 28);
+    try {
+      doc.addImage(FTTLogo, "PNG", 15, 10, 25, 25);
+    } catch (err) {
+      console.warn("Logo load error:", err);
+    }
 
-// ✅ Get logged-in user from localStorage
-const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-const testerName =
-  test.tested_by ||
-  storedUser?.email ||
-  storedUser?.name ||
-  "Admin";
+    doc.setFontSize(16);
+    doc.text("Furtherance Technotree Pvt Ltd, Indore", 45, 20);
+    doc.setFontSize(12);
+    doc.text("Laptop Full Diagnostic Report", 45, 28);
 
-// ✅ Use consistent timestamp
-const testedOn =
-  test.tested_on || test.created_at || new Date().toISOString();
+    const testerName = getTesterName(test.tested_by);
+    const testedOn = test.tested_on || test.created_at || new Date().toISOString();
 
-doc.setFontSize(10);
-doc.text(`Tested On: ${new Date(testedOn).toLocaleString()}`, 15, 45);
-doc.text(`Tested By: ${testerName}`, 120, 45);
+    doc.setFontSize(10);
+    doc.text(`Tested On: ${new Date(testedOn).toLocaleString()}`, 15, 45);
+    doc.text(`Tested By: ${testerName}`, 120, 45);
 
-   // --- QR code (Top right) ---
-  const qrData = encodeURIComponent(
-    JSON.stringify({
-      company: "Furtherance Technotree Pvt Ltd, Indore",
-      serialNo: test.serialNo,
-      model: test.model,
-      cpu: test.cpu,
-      ram: test.ram,
-      ssdHdd: test.ssdHdd,
-      testedBy: test.tested_by,
-      testedDate: new Date(test.created_at).toLocaleDateString(),
-    })
-  );
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${qrData}`;
-  doc.addImage(qrUrl, "PNG", 160, 10, 35, 35);
-
-    // --- Capitalize keys for PDF Table ---
-  const capitalize = (s: string) =>
-    s
-      .replace(/([A-Z])/g, " $1")
-      .replace(/^./, (str) => str.toUpperCase())
-      .trim();
-
-  const tableData = Object.entries(test)
-    .filter(([key]) => !["id", "created_at"].includes(key))
-    .map(([key, val]) => [capitalize(key), String(val)]);
-
-  autoTable(doc, {
-    startY: 50,
-    head: [["Parameter", "Result"]],
-    body: tableData,
-    styles: { fontSize: 9, cellPadding: 2 },
-    headStyles: { fillColor: [59, 130, 246] },
-  });
-
-  const finalY = doc.lastAutoTable.finalY + 15;
-  doc.text("Authorized Signature: ____________________", 15, finalY);
-  doc.text("Company Seal: ____________________", 15, finalY + 10);
-
-  doc.save(`FTT_Laptop_Report_${test.serialNo || "N/A"}.pdf`);
-};
-
-  const printQRSticker = (selectedTests: any[]) => {
-  if (!selectedTests.length) {
-    toast.error("No reports selected for QR printing.");
-    return;
-  }
-
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-  // ✅ Layout for 4×6 grid (24 stickers per A4)
-  const marginX = 8; // left/right outer margin
-  const marginY = 10; // top margin
-  const stickerWidth = 48; // width per sticker (A4 width ~210mm)
-  const stickerHeight = 40; // height per sticker
-  const stickersPerRow = 4;
-  const stickersPerPage = 24;
-
-  let x = marginX;
-  let y = marginY;
-  let count = 0;
-
-  selectedTests.forEach((test, i) => {
-    // --- Draw light border box for alignment ---
-    doc.setDrawColor(200); // light gray
-    doc.rect(x, y, stickerWidth, stickerHeight);
-
-    // --- QR Data ---
     const qrData = encodeURIComponent(
       JSON.stringify({
         company: "Furtherance Technotree Pvt Ltd, Indore",
-        mashincode: test.mashincode,
         serialNo: test.serialNo,
         model: test.model,
-        testedBy: test.tested_by,
-        testedDate: new Date(test.created_at).toLocaleDateString(),
+        cpu: test.cpu,
+        ram: test.ram,
+        ssdHdd: test.ssdHdd,
+        testedBy: testerName,
+        testedDate: new Date(testedOn).toLocaleDateString(),
       })
     );
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${qrData}`;
+    doc.addImage(qrUrl, "PNG", 160, 10, 35, 35);
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
-    const qrSize = 24; // smaller for 4-column fit
-    const qrX = x + (stickerWidth - qrSize) / 2;
-    const qrY = y + 4;
+    const capitalize = (s: string) =>
+      s.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
 
-    // --- Add QR Code ---
-    doc.addImage(qrUrl, "PNG", qrX, qrY, qrSize, qrSize);
+    const tableData = Object.entries(test)
+      .filter(([key]) => !["id", "created_at"].includes(key))
+      .map(([key, val]) => [capitalize(key), String(val)]);
 
-    // --- Center logo inside QR ---
-    try {
-      const logoSize = 7; // balanced center logo
-      const logoX = qrX + (qrSize - logoSize) / 2;
-      const logoY = qrY + (qrSize - logoSize) / 2;
-      doc.addImage(FTTLogo, "PNG", logoX, logoY, logoSize, logoSize);
-    } catch (err) {
-      console.warn("Logo overlay error:", err);
+    autoTable(doc, {
+      startY: 50,
+      head: [["Parameter", "Result"]],
+      body: tableData,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.text("Authorized Signature: ____________________", 15, finalY);
+    doc.text("Company Seal: ____________________", 15, finalY + 10);
+
+    doc.save(`FTT_Laptop_Report_${test.serialNo || "N/A"}.pdf`);
+  };
+
+  const printQRSticker = (selectedTests: any[]) => {
+    if (!selectedTests.length) {
+      toast.error("No reports selected for QR printing.");
+      return;
     }
 
-    // --- Company name + Serial No below QR ---
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("Furtherance Technotree Pvt Ltd", x + 3, y + 33);
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.text(`S/N: ${test.serialNo}`, x + 12, y + 37);
+    const marginX = 8,
+      marginY = 10,
+      stickerWidth = 48,
+      stickerHeight = 40,
+      stickersPerRow = 4,
+      stickersPerPage = 24;
 
-    // --- Grid placement ---
-    count++;
-    if (count % stickersPerRow === 0) {
-      x = marginX;
-      y += stickerHeight;
-      if (count % stickersPerPage === 0 && i < selectedTests.length - 1) {
-        doc.addPage();
+    let x = marginX,
+      y = marginY,
+      count = 0;
+
+    selectedTests.forEach((test, i) => {
+      doc.setDrawColor(200);
+      doc.rect(x, y, stickerWidth, stickerHeight);
+
+      const qrData = encodeURIComponent(
+        JSON.stringify({
+          company: "Furtherance Technotree Pvt Ltd, Indore",
+          mashincode: test.mashincode,
+          serialNo: test.serialNo,
+          model: test.model,
+          testedBy: getTesterName(test.tested_by),
+          testedDate: new Date(test.created_at).toLocaleDateString(),
+        })
+      );
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
+      const qrSize = 24,
+        qrX = x + (stickerWidth - qrSize) / 2,
+        qrY = y + 4;
+
+      doc.addImage(qrUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+      try {
+        const logoSize = 7;
+        doc.addImage(
+          FTTLogo,
+          "PNG",
+          qrX + (qrSize - logoSize) / 2,
+          qrY + (qrSize - logoSize) / 2,
+          logoSize,
+          logoSize
+        );
+      } catch {}
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.text("Furtherance Technotree Pvt Ltd", x + 3, y + 33);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text(`S/N: ${test.serialNo}`, x + 12, y + 37);
+
+      count++;
+      if (count % stickersPerRow === 0) {
         x = marginX;
-        y = marginY;
-      }
-    } else {
-      x += stickerWidth;
-    }
-  });
+        y += stickerHeight;
+        if (count % stickersPerPage === 0 && i < selectedTests.length - 1) {
+          doc.addPage();
+          x = marginX;
+          y = marginY;
+        }
+      } else x += stickerWidth;
+    });
 
-  // ✅ Print preview directly (no save)
-  const blobUrl = doc.output("bloburl");
-  const printWin = window.open(blobUrl);
-  if (printWin) {
-    printWin.onload = () => printWin.print();
-  }
-};
+    const blobUrl = doc.output("bloburl");
+    const printWin = window.open(blobUrl);
+    if (printWin) printWin.onload = () => printWin.print();
+  };
 
   const exportToExcel = async () => {
-  if (!reports.length) return toast.error("No data to export.");
+    if (!reports.length) return toast.error("No data to export.");
 
-  // --- Fetch transfer data ---
-  const { data: transfers, error: tErr } = await supabase
-    .from("laptop_transfers")
-    .select("*");
-  if (tErr) console.warn("Transfer fetch error:", tErr);
+    const { data: transfers, error: tErr } = await supabase
+      .from("transfers")
+      .select("*");
+    if (tErr) console.warn("Transfer fetch error:", tErr);
 
-  // --- Map full diagnostics + merge transfers if match found ---
-  const formatted = reports.map((r) => {
-    const transfer = transfers?.find((t) => t.serial_no === r.serialNo);
-    return {
-      MachineCode: r.mashincode,
-      Model: r.model,
-      SerialNo: r.serialNo,
-      OperatingSystem: r.os,
-      Generation: r.gen,
-      Processor: r.cpu,
-      RAM: r.ram,
-      Storage: r.ssdHdd,
-      SSDHealth: r.ssdHealth,
-      Touchscreen: r.touch,
-      DisplaySize: r.displaysize,
-      GraphicCard: r.graphiccard,
-      GraphicModel: r.graphicmodel,
-      HingesOK: r.hingesok,
-      BatteryHealth: r.batteryhealth,
-      HDMI: r.hdmiport,
-      WiFi: r.wifi,
-      Camera: r.camera,
-      Keyboard: r.keyboard,
-      Touchpad: r.touchpad,
-      PortsStatus: `${r.usbpr ? "Read OK" : "Read Fault"}, ${
-        r.usbpw ? "Write OK" : "Write Fault"
-      }`,
-      TestedBy: r.tested_by,
-      TestedDate: new Date(r.created_at).toLocaleString(),
-      Remarks: r.remarks,
-      // --- Transfer info (if exists)
-      TransferredTo: transfer?.to_user || "—",
-      TransferDate: transfer
-        ? new Date(transfer.created_at).toLocaleDateString()
-        : "—",
-      TransferRemarks: transfer?.remarks || "—",
-    };
-  });
+    const formatted = reports.map((r) => {
+      const transfer = transfers?.find((t) => t.laptop_id === r.id);
+      return {
+        MachineCode: r.mashincode,
+        Model: r.model,
+        SerialNo: r.serialNo,
+        OS: r.os,
+        Gen: r.gen,
+        CPU: r.cpu,
+        RAM: r.ram,
+        Storage: r.ssdHdd,
+        SSDHealth: r.ssdHealth,
+        TestedBy: getTesterName(r.tested_by),
+        TestedDate: new Date(r.created_at).toLocaleString(),
+        TransferType: transfer?.transfer_type || "—",
+        ToLocation: transfer?.to_location || "—",
+        TransferDate: transfer
+          ? new Date(transfer.transfer_date).toLocaleDateString()
+          : "—",
+        Remarks: r.remarks,
+      };
+    });
 
-  const ws = XLSX.utils.json_to_sheet(formatted);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "LaptopReports");
+    const ws = XLSX.utils.json_to_sheet(formatted);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "LaptopReports");
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  saveAs(
-    new Blob([buf], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }),
-    `FTT_Laptop_Reports_${new Date().toISOString()}.xlsx`
-  );
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    saveAs(
+      new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      `FTT_Laptop_Reports_${new Date().toISOString()}.xlsx`
+    );
 
-  toast.success("✅ Excel exported successfully with full data!");
-};
+    toast.success("✅ Excel exported successfully!");
+  };
 
   if (loading) return <p className="p-6 text-gray-500">Loading reports...</p>;
 
@@ -279,21 +261,22 @@ doc.text(`Tested By: ${testerName}`, 120, 45);
         <h1 className="text-2xl font-semibold">📋 Laptop Diagnostic Reports</h1>
 
         <div className="flex gap-2">
-          {isAdmin && (
-            <>
-              <button
-                onClick={exportToExcel}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
-              >
-                ⬇️ Export All to Excel
-              </button>
-              <button
-                onClick={() => printQRSticker(selectedReports)}
-                className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg shadow"
-              >
-                🖨️ Print Selected QR Stickers
-              </button>
-            </>
+          {canExport && (
+            <button
+              onClick={exportToExcel}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
+            >
+              ⬇️ Export All to Excel
+            </button>
+          )}
+
+          {(isAdmin || isAuthor) && (
+            <button
+              onClick={() => printQRSticker(selectedReports)}
+              className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg shadow"
+            >
+              🖨️ Print Selected QR Stickers
+            </button>
           )}
         </div>
       </div>
@@ -340,8 +323,10 @@ doc.text(`Tested By: ${testerName}`, 120, 45);
                 <td className="p-3">{r.cpu}</td>
                 <td className="p-3">{r.ram}</td>
                 <td className="p-3">{r.ssdHdd}</td>
-                <td className="p-3">{r.tested_by || "—"}</td>
-                <td className="p-3">{new Date(r.created_at).toLocaleDateString()}</td>
+                <td className="p-3">{getTesterName(r.tested_by)}</td>
+                <td className="p-3">
+                  {new Date(r.created_at).toLocaleDateString()}
+                </td>
                 <td className="p-3 text-center flex justify-center gap-2">
                   {(isAdmin || r.tested_by === user.id) && (
                     <>
