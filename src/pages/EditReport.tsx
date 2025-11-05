@@ -60,6 +60,7 @@ type LaptopForm = {
   driveri: boolean;
   softi: boolean;
   dl: boolean;
+  photoshoot: boolean;
   remarks: string;
 };
 
@@ -187,8 +188,11 @@ export default function EditReport() {
           <select {...register("displaysize")} className="w-full border p-2 rounded">
             <option value="">Display Size</option>
             <option>13"</option>
+            <option>13.3"</option>
             <option>14"</option>
             <option>15"</option>
+            <option>16"</option>
+            
           </select>
           <select {...register("graphiccard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
@@ -275,6 +279,7 @@ export default function EditReport() {
             "driveri",
             "softi",
             "dl",
+            "Photo Shoot Done",
           ].map((field) => (
             <label key={field}>
               <input type="checkbox" {...register(field as keyof LaptopForm)} /> {field.replace(/([A-Z])/g, " $1")}

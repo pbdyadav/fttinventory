@@ -69,6 +69,9 @@ const LaptopTest = () => {
   const [testDate, setTestDate] = useState<string>("");
   const [qrUrl, setQrUrl] = useState<string>("");
 
+  // ✅ Get user from localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
   // Fetch next machine code on mount
   useEffect(() => {
     const fetchNextCode = async () => {
@@ -117,18 +120,17 @@ const LaptopTest = () => {
       return;
     }
 
-    // ✅ Save Laptop Test
-    // ✅ Include tested_by and tested_on fields
-const { error: testError } = await supabase.from("laptop_tests").insert([
-  {
-    ...data,
-    tested_by: user?.id, // ✅ Save UUID instead of email or name
-    tested_on: new Date().toISOString(),
-  },
-]);
-    if (testError) throw testError;
+      // ✅ Save Laptop Test — add tested_by & tested_on
+      const { error: testError } = await supabase.from("laptop_tests").insert([
+        {
+          ...data,
+          tested_by: user?.id || user?.email || "unknown",
+          tested_on: new Date().toISOString(),
+        },
+      ]);
+      if (testError) throw testError;
 
-    // ✅ Auto-add to Inventory (if not exists)
+     // ✅ Auto-add to Inventory (if not exists)
     const { data: invExists } = await supabase
       .from("inventory")
       .select("id")
@@ -269,9 +271,6 @@ const { error: testError } = await supabase.from("laptop_tests").insert([
             <option>256GB SSD</option>
             <option>512GB SSD</option>
             <option>1TB SSD</option>
-            <option>2TB SSD</option>
-            <option>4TB SSD</option>
-            <option>8TB SSD</option>
             <option>128GB SSD + 500GB HDD</option>
             <option>128GB SSD + 1TB HDD</option>
             <option>256GB SSD + 500GB HDD</option>

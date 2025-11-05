@@ -13,37 +13,85 @@ export default function Reports() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const [user, setUser] = useState<any>(() => {
+    const cached = localStorage.getItem("user");
+    return cached ? JSON.parse(cached) : null;
+  });
 
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const role = user?.role;
+
+  // ✅ Step 1: Ensure user restored properly even after refresh
+  useEffect(() => {
+    const restoreUser = async () => {
+      let stored = JSON.parse(localStorage.getItem("user") || "{}");
+
+      // Fallback if user missing or incomplete
+      if (!stored?.email) {
+        const { data: session } = await supabase.auth.getSession();
+        const email = session?.session?.user?.email;
+
+        if (!email) {
+          toast.error("Session expired. Please log in again.");
+          window.location.href = "/login";
+          return;
+        }
+
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, email, role, full_name")
+          .eq("email", email)
+          .single();
+
+        if (data) {
+          stored = data;
+          localStorage.setItem("user", JSON.stringify(data));
+        }
+      }
+
+      // Fetch role if missing
+      if (stored?.email && !stored?.role) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, email, role, full_name")
+          .eq("email", stored.email)
+          .single();
+
+        if (data) {
+          stored = data;
+          localStorage.setItem("user", JSON.stringify(data));
+        }
+      }
+
+      setUser(stored);
+    };
+
+    restoreUser();
+  }, []);
+
+  const role = user?.role || "";
   const isAdmin = role === "Admin";
   const isAuthor = role === "Staff";
 
-  // ✅ allowed Excel users
   const canExport =
-    user.email === "praveenyadav4u@gmail.com" ||
-    user.email === "fttpvtltd@gmail.com";
+    user?.email === "praveenyadav4u@gmail.com" ||
+    user?.email === "fttpvtltd@gmail.com";
 
-  // ✅ Load Profiles + Reports once
+  // ✅ Step 2: Load reports + profiles when user ready
   useEffect(() => {
+    if (!user?.email) return;
     const loadData = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Load profiles
-        const { data: profileData, error: pErr } = await supabase
+        // Load all profiles
+        const { data: profileData } = await supabase
           .from("profiles")
           .select("id, full_name, email");
-        if (pErr) {
-          console.error("Profile fetch error:", pErr);
-          toast.error("Error loading profiles");
-        } else {
-          const map: Record<string, any> = {};
-          (profileData || []).forEach((p) => (map[p.id] = p));
-          setProfiles(map);
-        }
 
-        // 2️⃣ Load reports
+        const map: Record<string, any> = {};
+        (profileData || []).forEach((p) => (map[p.id] = p));
+        setProfiles(map);
+
+        // Load reports
         let query = supabase
           .from("laptop_tests")
           .select("*")
@@ -53,15 +101,10 @@ export default function Reports() {
           query = query.eq("tested_by", user.id);
         }
 
-        const { data: reportData, error: rErr } = await query;
-        if (rErr) {
-          console.error("Reports fetch error:", rErr);
-          toast.error("Error loading reports");
-        } else {
-          setReports(reportData || []);
-        }
+        const { data: reportData } = await query;
+        setReports(reportData || []);
       } catch (err) {
-        console.error("Unexpected error loading data:", err);
+        console.error(err);
         toast.error("Failed to load reports");
       } finally {
         setLoading(false);
@@ -69,7 +112,11 @@ export default function Reports() {
     };
 
     loadData();
-  }, [user?.id, role]); // Runs only when user changes
+  }, [user, role]);
+
+  if (!user || loading) {
+    return <p className="p-6 text-gray-500">Loading reports...</p>;
+  }
 
   // ✅ Toggle selection for checkboxes
   const toggleSelect = (id: string) => {
@@ -138,7 +185,6 @@ export default function Reports() {
     const finalY = doc.lastAutoTable.finalY + 15;
     doc.text("Authorized Signature: ____________________", 15, finalY);
     doc.text("Company Seal: ____________________", 15, finalY + 10);
-
     doc.save(`FTT_Laptop_Report_${test.serialNo || "N/A"}.pdf`);
   };
 
@@ -162,50 +208,68 @@ export default function Reports() {
       count = 0;
 
     selectedTests.forEach((test, i) => {
-      doc.setDrawColor(200);
-      doc.rect(x, y, stickerWidth, stickerHeight);
+  doc.setDrawColor(200);
+  doc.rect(x, y, stickerWidth, stickerHeight);
 
-      const qrData = encodeURIComponent(
-        JSON.stringify({
-          company: "Furtherance Technotree Pvt Ltd, Indore",
-          mashincode: test.mashincode,
-          serialNo: test.serialNo,
-          model: test.model,
-          testedBy: getTesterName(test.tested_by),
-          testedDate: new Date(test.created_at).toLocaleDateString(),
-        })
-      );
+  // 🔹 Generate QR Data
+  const qrData = encodeURIComponent(
+    JSON.stringify({
+      company: "Furtherance Technotree Pvt Ltd, Indore",
+      mashincode: test.mashincode,
+      serialNo: test.serialNo,
+      model: test.model,
+      testedBy: getTesterName(test.tested_by),
+      testedDate: new Date(test.created_at).toLocaleDateString(),
+    })
+  );
 
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
-      const qrSize = 24,
-        qrX = x + (stickerWidth - qrSize) / 2,
-        qrY = y + 4;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
+  const qrSize = 26; // slightly bigger for better visibility
+  const qrX = x + (stickerWidth - qrSize) / 2;
+  const qrY = y + 3; // slightly reduced top margin
 
-      doc.addImage(qrUrl, "PNG", qrX, qrY, qrSize, qrSize);
+  // 🧾 Add QR Image
+  doc.addImage(qrUrl, "PNG", qrX, qrY, qrSize, qrSize);
 
-      try {
-        const logoSize = 7;
-        doc.addImage(FTTLogo, "PNG", qrX + 8, qrY + 8, logoSize, logoSize);
-      } catch {}
+  // 🏢 Add Logo in Center of QR (optional)
+  try {
+    const logoSize = 7;
+    const logoX = qrX + (qrSize - logoSize) / 2;
+    const logoY = qrY + (qrSize - logoSize) / 2;
+    doc.addImage(FTTLogo, "PNG", logoX, logoY, logoSize, logoSize);
+  } catch {}
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.text("Furtherance Technotree Pvt Ltd", x + 3, y + 33);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.text(`S/N: ${test.serialNo}`, x + 12, y + 37);
+  // 🧩 Add Text (centered and visually balanced)
+  const centerX = x + stickerWidth / 2;
+  const textStartY = qrY + qrSize + 3.5; // closer to QR — tight layout
 
-      count++;
-      if (count % stickersPerRow === 0) {
-        x = marginX;
-        y += stickerHeight;
-        if (count % stickersPerPage === 0 && i < selectedTests.length - 1) {
-          doc.addPage();
-          x = marginX;
-          y = marginY;
-        }
-      } else x += stickerWidth;
-    });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text("Furtherance Technotree Pvt Ltd", centerX, textStartY, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`S/N: ${test.serialNo}`, centerX, textStartY + 3, { align: "center" });
+  doc.text(`Machine Code: ${test.mashincode}`, centerX, textStartY + 5.8, { align: "center" });
+
+  // Optional: Add model line (if not empty)
+  if (test.model) {
+    doc.text(`${test.model}`, centerX, textStartY + 8.6, { align: "center" });
+  }
+
+  count++;
+  if (count % stickersPerRow === 0) {
+    x = marginX;
+    y += stickerHeight;
+    if (count % stickersPerPage === 0 && i < selectedTests.length - 1) {
+      doc.addPage();
+      x = marginX;
+      y = marginY;
+    }
+  } else {
+    x += stickerWidth;
+  }
+});
 
     const blobUrl = doc.output("bloburl");
     const printWin = window.open(blobUrl);
@@ -216,10 +280,7 @@ export default function Reports() {
   const exportToExcel = async () => {
     if (!reports.length) return toast.error("No data to export.");
 
-    const { data: transfers, error: tErr } = await supabase
-      .from("transfers")
-      .select("*");
-    if (tErr) console.warn("Transfer fetch error:", tErr);
+    const { data: transfers } = await supabase.from("transfers").select("*");
 
     const formatted = reports.map((r) => {
       const transfer = transfers?.find((t) => t.laptop_id === r.id);
@@ -259,9 +320,6 @@ export default function Reports() {
     toast.success("✅ Excel exported successfully!");
   };
 
-  if (loading)
-    return <p className="p-6 text-gray-500">Loading reports...</p>;
-
   const selectedReports = reports.filter((r) => selected.includes(r.id));
 
   return (
@@ -279,14 +337,23 @@ export default function Reports() {
             </button>
           )}
 
-          {(isAdmin || isAuthor) && (
-            <button
-              onClick={() => printQRSticker(selectedReports)}
-              className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg shadow"
-            >
-              🖨️ Print Selected QR Stickers
-            </button>
-          )}
+          <button
+  onClick={() => {
+    if (selectedReports.length === 0) {
+      alert("⚠️ Please select at least one report to print QR stickers.");
+      return;
+    }
+    printQRSticker(selectedReports);
+  }}
+  className={`px-4 py-2 rounded-lg shadow text-white ${
+    selectedReports.length > 0
+      ? "bg-purple-700 hover:bg-purple-800"
+      : "bg-gray-400 cursor-not-allowed"
+  }`}
+>
+  🖨️ Print Selected QR Stickers
+</button>
+
         </div>
       </div>
 
@@ -305,7 +372,7 @@ export default function Reports() {
                   checked={selected.length === reports.length}
                 />
               </th>
-              <th className="p-3 text-left">Machine Code</th>
+              <th className="p-3 text-left">M. Code</th>
               <th className="p-3 text-left">Serial No</th>
               <th className="p-3 text-left">Model</th>
               <th className="p-3 text-left">CPU</th>
@@ -333,34 +400,26 @@ export default function Reports() {
                 <td className="p-3">{r.ram}</td>
                 <td className="p-3">{r.ssdHdd}</td>
                 <td className="p-3">{getTesterName(r.tested_by)}</td>
-                <td className="p-3">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </td>
+                <td className="p-3">{new Date(r.created_at).toLocaleDateString()} </td>
                 <td className="p-3 text-center flex justify-center gap-2">
-                  {(isAdmin || r.tested_by === user.id) && (
-                    <>
-                      <button
-                        onClick={() => generatePDF(r)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                      >
-                        🧾 PDF
-                      </button>
-                      <button
-                        onClick={() => printQRSticker([r])}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm"
-                      >
-                        🖨️ QR
-                      </button>
-                    </>
-                  )}
-                  {(isAdmin || isAuthor) && (
-                    <button
-                      onClick={() => navigate(`/edit-report/${r.id}`)}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
-                    >
-                      ✏️ Edit
-                    </button>
-                  )}
+        {/* 👇 Everyone can see these three */}
+            <button onClick={() => generatePDF(r)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+             >
+                    🧾 PDF
+            </button>
+
+            <button onClick={() => printQRSticker([r])}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm"
+            >
+                    🖨️ QR
+            </button>
+
+            <button onClick={() => navigate(`/edit-report/${r.id}`)}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
+            >
+                    ✏️ Edit
+            </button>
                 </td>
               </tr>
             ))}
