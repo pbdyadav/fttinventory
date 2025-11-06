@@ -149,8 +149,24 @@ export default function Reports() {
     const testedOn = test.tested_on || test.created_at || new Date().toISOString();
 
     doc.setFontSize(10);
-    doc.text(`Tested On: ${new Date(testedOn).toLocaleString()}`, 15, 45);
-    doc.text(`Tested By: ${testerName}`, 120, 45);
+    // 🕒 Convert UTC to IST (GMT+5:30)
+const testedDate = new Date(testedOn);
+const istOffsetMs = 5.5 * 60 * 60 * 1000; // +5:30 hours
+const istTime = new Date(testedDate.getTime() + istOffsetMs);
+
+// Format cleanly for India (DD/MM/YYYY, hh:mm:ss AM/PM)
+const formattedIST = istTime.toLocaleString("en-IN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+});
+
+doc.text(`Tested On: ${formattedIST}`, 15, 45);
+    doc.text(`Tested By: ${testerName}`, 115, 45);
 
     const qrData = encodeURIComponent(
       JSON.stringify({
@@ -224,9 +240,9 @@ export default function Reports() {
   );
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
-  const qrSize = 26; // slightly bigger for better visibility
+  const qrSize = 24; // slightly bigger for better visibility
   const qrX = x + (stickerWidth - qrSize) / 2;
-  const qrY = y + 3; // slightly reduced top margin
+  const qrY = y + 2; // slightly reduced top margin
 
   // 🧾 Add QR Image
   doc.addImage(qrUrl, "PNG", qrX, qrY, qrSize, qrSize);
@@ -241,16 +257,17 @@ export default function Reports() {
 
   // 🧩 Add Text (centered and visually balanced)
   const centerX = x + stickerWidth / 2;
-  const textStartY = qrY + qrSize + 3.5; // closer to QR — tight layout
+  const textStartY = qrY + qrSize + 4.5; // closer to QR — tight layout
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text("Furtherance Technotree Pvt Ltd", centerX, textStartY, { align: "center" });
+  doc.text("Furtherance Technotree Pvt Ltd", centerX, textStartY - 1, { align: "center" });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text(`S/N: ${test.serialNo}`, centerX, textStartY + 3, { align: "center" });
-  doc.text(`Machine Code: ${test.mashincode}`, centerX, textStartY + 5.8, { align: "center" });
+  doc.text(`Machine Code: ${test.mashincode}`, centerX, textStartY + 2.5, { align: "center" });
+  doc.text(`S/N: ${test.serialNo}`, centerX, textStartY + 5.8, { align: "center" });
+  
 
   // Optional: Add model line (if not empty)
   if (test.model) {
