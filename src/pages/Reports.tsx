@@ -74,6 +74,7 @@ export default function Reports() {
 
   const canExport =
     user?.email === "praveenyadav4u@gmail.com" ||
+    user?.email === "adnan@gmail.com" ||
     user?.email === "fttpvtltd@gmail.com";
 
   // ✅ Step 2: Load reports + profiles when user ready
