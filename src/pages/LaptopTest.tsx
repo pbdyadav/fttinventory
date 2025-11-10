@@ -73,36 +73,35 @@ const LaptopTest = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Fetch next machine code on mount
-  useEffect(() => {
-    const fetchNextCode = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("laptop_tests")
-          .select("mashincode")
-          .order("mashincode", { ascending: false })
-          .limit(1);
+ // Fetch next machine code on mount
+useEffect(() => {
+  const fetchNextCode = async () => {
+    try {
+      const { data, error } = await supabase.rpc("get_next_machine_code");
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const lastCode = data?.[0]?.mashincode || 100;
-        const nextCode = lastCode + 1;
-        setNextMachineCode(nextCode);
-        setValue("mashincode", nextCode);
-      } catch (err: any) {
-        console.error("Error fetching machine code:", err.message);
-        setNextMachineCode(101);
-        setValue("mashincode", 101);
-      }
-    };
+      const nextCode = data || 101;
+      setNextMachineCode(nextCode);
+      setValue("mashincode", nextCode);
+    } catch (err: any) {
+      console.error("Error fetching machine code:", err.message);
+      toast.error("Failed to fetch next machine code.");
+      setNextMachineCode(101);
+      setValue("mashincode", 101);
+    }
+  };
 
-    fetchNextCode();
-    // set test date and tester
-    const now = new Date();
-    setTestDate(now.toISOString().slice(0, 10));
-    supabase.auth.getUser().then(({ data }) => {
-      setTestedBy(data?.user?.email || "");
-    });
-  }, [setValue]);
+  fetchNextCode();
+
+  // ✅ Set test date and tester (moved inside same effect)
+  const now = new Date();
+  setTestDate(now.toISOString().slice(0, 10));
+
+  supabase.auth.getUser().then(({ data }) => {
+    setTestedBy(data?.user?.email || "");
+  });
+}, [setValue]);
 
   
   // ✅ Handle form submit + auto add to inventory
@@ -248,6 +247,7 @@ const LaptopTest = () => {
             <option>6th</option>
             <option>7th</option>
             <option>8th</option>
+            <option>9th</option>
             <option>10th</option>
             <option>11th</option>
             <option>12th</option>
