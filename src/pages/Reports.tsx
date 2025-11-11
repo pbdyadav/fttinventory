@@ -301,27 +301,37 @@ doc.text(`Tested On: ${formattedIST}`, 15, 45);
     const { data: transfers } = await supabase.from("transfers").select("*");
 
     const formatted = reports.map((r) => {
-      const transfer = transfers?.find((t) => t.laptop_id === r.id);
-      return {
-        MachineCode: r.mashincode,
-        Model: r.model,
-        SerialNo: r.serialNo,
-        OS: r.os,
-        Gen: r.gen,
-        CPU: r.cpu,
-        RAM: r.ram,
-        Storage: r.ssdHdd,
-        SSDHealth: r.ssdHealth,
-        TestedBy: getTesterName(r.tested_by),
-        TestedDate: new Date(r.created_at).toLocaleString(),
-        TransferType: transfer?.transfer_type || "—",
-        ToLocation: transfer?.to_location || "—",
-        TransferDate: transfer
-          ? new Date(transfer.transfer_date).toLocaleDateString()
-          : "—",
-        Remarks: r.remarks,
-      };
-    });
+  const transfer = transfers?.find((t) => t.laptop_id === r.id);
+  return {
+    MachineCode: r.mashincode,
+    Model: r.model,
+    SerialNo: r.serialNo,
+    OS: r.os,
+    Gen: r.gen,
+    CPU: r.cpu,
+    RAM: r.ram,
+    Storage: r.ssdHdd,
+    SSDHealth: r.ssdHealth,
+    TestedBy: getTesterName(r.tested_by),
+    TestedDate: new Date(r.created_at).toLocaleString(),
+
+    // 🔁 Transfer / Receiver Info
+    TransferType: transfer?.transfer_type || "—",
+    ToLocation: transfer?.to_location || "—",
+    FromLocation: transfer?.from_location || "—",
+    TransferDate: transfer
+      ? new Date(transfer.transfer_date).toLocaleString()
+      : "—",
+    ReceiverName: transfer?.person_name || "—",
+    ReceiverContact: transfer?.contact_info || "—",
+    ReceiverAddress: transfer?.address || "—",
+    TransferRemarks: transfer?.remarks || "—",
+
+    // 🗒️ Internal Remarks from test
+    TestRemarks: r.remarks || "—",
+  };
+});
+
 
     const ws = XLSX.utils.json_to_sheet(formatted);
     const wb = XLSX.utils.book_new();
