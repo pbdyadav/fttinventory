@@ -295,58 +295,66 @@ doc.text(`Tested On: ${formattedIST}`, 15, 45);
   };
 
   // ✅ Export All to Excel
-  const exportToExcel = async () => {
-    if (!reports.length) return toast.error("No data to export.");
+const exportToExcel = async () => {
+  if (!reports.length) return toast.error("No data to export.");
 
-    const { data: transfers } = await supabase.from("transfers").select("*");
+  // Fetch all transfers (includes person_name, address, etc.)
+  const { data: transfers } = await supabase
+    .from("transfers")
+    .select("*")
+    .order("transfer_date", { ascending: false }); // ensures latest comes first
 
-    const formatted = reports.map((r) => {
-  const transfer = transfers?.find((t) => t.laptop_id === r.id);
-  return {
-    MachineCode: r.mashincode,
-    Model: r.model,
-    SerialNo: r.serialNo,
-    OS: r.os,
-    Gen: r.gen,
-    CPU: r.cpu,
-    RAM: r.ram,
-    Storage: r.ssdHdd,
-    SSDHealth: r.ssdHealth,
-    TestedBy: getTesterName(r.tested_by),
-    TestedDate: new Date(r.created_at).toLocaleString(),
+  // Map reports to include final/latest transfer data
+  const formatted = reports.map((r) => {
+    // 🧠 Find the latest transfer for this laptop
+    const transfer = transfers?.find((t) => t.laptop_id === r.id);
 
-    // 🔁 Transfer / Receiver Info
-    TransferType: transfer?.transfer_type || "—",
-    ToLocation: transfer?.to_location || "—",
-    FromLocation: transfer?.from_location || "—",
-    TransferDate: transfer
-      ? new Date(transfer.transfer_date).toLocaleString()
-      : "—",
-    ReceiverName: transfer?.person_name || "—",
-    ReceiverContact: transfer?.contact_info || "—",
-    ReceiverAddress: transfer?.address || "—",
-    TransferRemarks: transfer?.remarks || "—",
+    return {
+      MachineCode: r.mashincode,
+      Model: r.model,
+      SerialNo: r.serialNo,
+      OS: r.os,
+      Gen: r.gen,
+      CPU: r.cpu,
+      RAM: r.ram,
+      Storage: r.ssdHdd,
+      SSDHealth: r.ssdHealth,
+      TestedBy: getTesterName(r.tested_by),
+      TestedDate: new Date(r.created_at).toLocaleString(),
 
-    // 🗒️ Internal Remarks from test
-    TestRemarks: r.remarks || "—",
-  };
-});
+      // 🔁 Transfer / Receiver Info
+      TransferType: transfer?.transfer_type || "—",
+      ToLocation: transfer?.to_location || "—",
+      FromLocation: transfer?.from_location || "—",
+      TransferDate: transfer
+        ? new Date(transfer.transfer_date).toLocaleString()
+        : "—",
+      ReceiverName: transfer?.person_name || "—",
+      ReceiverContact: transfer?.contact_info || "—",
+      ReceiverAddress: transfer?.address || "—",
+      TransferRemarks: transfer?.remarks || "—",
+
+      // 🗒️ Internal Remarks from test
+      TestRemarks: r.remarks || "—",
+    };
+  });
 
 
-    const ws = XLSX.utils.json_to_sheet(formatted);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "LaptopReports");
+    // ✅ Generate Excel file
+  const ws = XLSX.utils.json_to_sheet(formatted);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "LaptopReports");
 
-    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    saveAs(
-      new Blob([buf], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      }),
-      `FTT_Laptop_Reports_${new Date().toISOString()}.xlsx`
-    );
+  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  saveAs(
+    new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `FTT_Laptop_Reports_${new Date().toISOString()}.xlsx`
+  );
 
-    toast.success("✅ Excel exported successfully!");
-  };
+  toast.success("✅ Excel exported successfully!");
+};
 
   const selectedReports = reports.filter((r) => selected.includes(r.id));
 
