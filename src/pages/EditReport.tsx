@@ -96,8 +96,15 @@ export default function EditReport() {
         .eq("id", id);
 
       if (error) throw error;
-      toast.success("✅ Report updated successfully!");
-      navigate("/reports");
+      toast.success("✅ Report updated successfully! Logging out for security...");
+
+      setTimeout(async () => {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      window.location.href = "/login";
+      }, 2000);
+
+
     } catch (err: any) {
       toast.error("❌ Error updating report: " + err.message);
     }

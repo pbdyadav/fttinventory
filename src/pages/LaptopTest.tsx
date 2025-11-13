@@ -185,6 +185,14 @@ useEffect(() => {
 
       alert(`✅ Laptop test saved and added to inventory! Machine Code: ${data.mashincode}`);
 
+      // 🔒 Auto logout for security
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        localStorage.clear();
+        alert("🔐 Session ended for security. Please log in again.");
+        window.location.href = "/login";
+      }, 2000);
+
       // Reset form and increment machine code
       const newCode = (nextMachineCode ?? 100) + 1;
       setNextMachineCode(newCode);
@@ -271,6 +279,9 @@ useEffect(() => {
             <option>256GB SSD</option>
             <option>512GB SSD</option>
             <option>1TB SSD</option>
+            <option>2TB SSD</option>
+            <option>4TB SSD</option>
+            <option>8TB SSD</option>
             <option>128GB SSD + 500GB HDD</option>
             <option>128GB SSD + 1TB HDD</option>
             <option>256GB SSD + 500GB HDD</option>
