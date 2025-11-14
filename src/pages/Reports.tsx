@@ -171,7 +171,7 @@ doc.text(`Tested On: ${formattedIST}`, 15, 45);
 
     const qrData = encodeURIComponent(
       JSON.stringify({
-        company: " ",
+        company: "Furtherance Technotree Pvt Ltd, Indore",
         serialNo: test.serialNo,
         model: test.model,
         cpu: test.cpu,
@@ -231,7 +231,7 @@ doc.text(`Tested On: ${formattedIST}`, 15, 45);
   // 🔹 Generate QR Data
   const qrData = encodeURIComponent(
     JSON.stringify({
-      company: "Furtherance Technotree Pvt Ltd, Indore",
+      company: " ",
       mashincode: test.mashincode,
       serialNo: test.serialNo,
       model: test.model,
