@@ -185,6 +185,10 @@ useEffect(() => {
 
       alert(`✅ Laptop test saved and added to inventory! Machine Code: ${data.mashincode}`);
 
+      {/*await supabase.auth.signOut();
+localStorage.removeItem("user");
+window.location.href = "/login"; */}
+
       // 🔒 Auto logout for security
       setTimeout(async () => {
         await supabase.auth.signOut();

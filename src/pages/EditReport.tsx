@@ -98,6 +98,11 @@ export default function EditReport() {
       if (error) throw error;
       toast.success("✅ Report updated successfully! Logging out for security...");
 
+     {/*} await supabase.auth.signOut();
+localStorage.removeItem("user");
+window.location.href = "/login"; */}
+
+
       setTimeout(async () => {
       await supabase.auth.signOut();
       localStorage.clear();
