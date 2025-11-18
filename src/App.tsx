@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Toaster } from "sonner";
@@ -17,50 +17,52 @@ import EditReport from "@/pages/EditReport";
 import Navbar from "@/components/Navbar";
 import AutoLogout from "@/components/AutoLogout";
 
-// 🚫 Protect Routes
-function PrivateRoute({ children }: { children: JSX.Element }) {
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
-  const user = localStorage.getItem("user");
+// 🔒 NEW Protected Route (uses React state only)
+function PrivateRoute({
+  children,
+  isLoggedIn,
+  loading,
+}: {
+  children: JSX.Element;
+  isLoggedIn: boolean;
+  loading: boolean;
+}) {
+  if (loading) return null; // ⛔ don't redirect while loading session
 
-  return isLoggedIn && user ? children : <Navigate to="/login" replace />;
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    localStorage.getItem("isLoggedIn") === "true"
-  );
+  const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // ✅ Correct useEffect (NO nesting)
+  // 🔥 Load session ONCE on startup
   useEffect(() => {
-    const checkSession = async () => {
+    const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
+
       if (data?.session) {
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("user", JSON.stringify(data.session.user));
         setIsLoggedIn(true);
+        localStorage.setItem("user", JSON.stringify(data.session.user));
       } else {
-        localStorage.removeItem("isLoggedIn");
-        localStorage.removeItem("user");
         setIsLoggedIn(false);
+        localStorage.removeItem("user");
       }
+
+      setLoading(false); // 🟢 Now safe to render
     };
 
-    checkSession();
+    loadSession();
 
-    // 🔄 Listen for session changes
+    // 🔄 Auth event listener (NO redirect here)
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session) {
-          // Logged in
-          localStorage.setItem("isLoggedIn", "true");
-          localStorage.setItem("user", JSON.stringify(session.user));
           setIsLoggedIn(true);
+          localStorage.setItem("user", JSON.stringify(session.user));
         } else {
-          // 🔴 Session revoked, expired, or logged in from another device
-          localStorage.removeItem("isLoggedIn");
-          localStorage.removeItem("user");
           setIsLoggedIn(false);
-          window.location.href = "/login";
+          localStorage.removeItem("user");
         }
       }
     );
@@ -68,29 +70,92 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  if (loading) {
+    // ⛔ Prevent flicker — display static loading screen
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
 
-      {/* 🟢 Auto Logout After 15 Minutes */}
-      <AutoLogout timeout={15 * 60 * 1000} />
+      {/* Auto Logout only when logged in */}
+      {isLoggedIn && <AutoLogout timeout={15 * 60 * 1000} />}
 
       {isLoggedIn && <Navbar />}
 
       <main className="p-4">
         <Routes>
-          {/* Public */}
+          {/* Public Login */}
           <Route path="/login" element={<Login />} />
 
           {/* Protected */}
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/laptop-test" element={<PrivateRoute><LaptopTest /></PrivateRoute>} />
-          <Route path="/laptop-inventory" element={<PrivateRoute><LaptopInventory /></PrivateRoute>} />
-          <Route path="/laptops/:id" element={<PrivateRoute><LaptopDetail /></PrivateRoute>} />
-          <Route path="/transfer" element={<PrivateRoute><Transfer /></PrivateRoute>} />
-          <Route path="/transfer/:id" element={<PrivateRoute><Transfer /></PrivateRoute>} />
-          <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
-          <Route path="/edit-report/:id" element={<PrivateRoute><EditReport /></PrivateRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/laptop-test"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <LaptopTest />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/laptop-inventory"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <LaptopInventory />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/laptops/:id"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <LaptopDetail />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/transfer/:id"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <Transfer />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/reports"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <Reports />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/edit-report/:id"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <EditReport />
+              </PrivateRoute>
+            }
+          />
 
           {/* Default */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -2,31 +2,35 @@ import { useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function AutoLogout({ timeout = 15 * 60 * 1000 }) {
+  const user = localStorage.getItem("user");
+
   useEffect(() => {
+    if (!user) return; // ⛔ do nothing if not logged-in
+
     let timer: any;
 
-    const resetTimer = () => {
+    const reset = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
         await supabase.auth.signOut();
-        localStorage.removeItem("user");
+        localStorage.clear();
         window.location.href = "/login";
       }, timeout);
     };
 
-    // Activity events that reset timer
-    const events = ["mousemove", "keypress", "click", "scroll"];
-    events.forEach((event) => window.addEventListener(event, resetTimer));
+    ["mousemove", "keypress", "click", "scroll"].forEach((evt) =>
+      window.addEventListener(evt, reset)
+    );
 
-    resetTimer();
+    reset();
 
     return () => {
-      events.forEach((event) =>
-        window.removeEventListener(event, resetTimer)
+      ["mousemove", "keypress", "click", "scroll"].forEach((evt) =>
+        window.removeEventListener(evt, reset)
       );
       clearTimeout(timer);
     };
-  }, [timeout]);
+  }, [user, timeout]);
 
   return null;
 }
