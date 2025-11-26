@@ -14,6 +14,8 @@ type LaptopForm = {
   ssdHealth: string;
   touch: string;
   displaysize: string;
+  typesofscreenresolutions: string;
+
   graphiccard: string;
   graphicmodel: string;
   displaydotsA: boolean;
@@ -147,6 +149,7 @@ useEffect(() => {
         ssdHealth: data.ssdHealth,
         touch: data.touch,
         displaysize: data.displaysize,
+        typesofscreenresolutions: statusbar.typesofscreenresolutions,
         graphiccard: data.graphiccard,
         location: "Warehouse A",
         quantity: 1,
@@ -304,6 +307,14 @@ window.location.href = "/login"; */}
             <option>14"</option>
             <option>15"</option>
             <option>16"</option>
+          </select>
+          <select {...register("typesofscreenresolutions")} className="w-full border p-2 rounded">
+            <option value="">Types of Screen Resolutions (SD/HD/HDR/FHD)</option>
+            <option>SD"</option>
+            <option>HD"</option>
+            <option>HDR"</option>
+            <option>FHD"</option>
+            <option>4K"</option>
           </select>
           <select {...register("graphiccard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
