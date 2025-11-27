@@ -126,7 +126,8 @@ export default function LaptopInventory() {
   const filteredLaptops = laptops.filter((item) =>
     item.mashincode?.toString().includes(search.toLowerCase()) ||
     item.serialNo?.toLowerCase().includes(search.toLowerCase()) ||
-    item.model?.toLowerCase().includes(search.toLowerCase())
+    item.model?.toLowerCase().includes(search.toLowerCase()) ||
+    item.graphiccard?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -136,7 +137,7 @@ export default function LaptopInventory() {
       {/* ✅ SEARCH BAR */}
       <input
         type="text"
-        placeholder="Search: M. Code, Serial No, Model..."
+        placeholder="Search: M. Code, Serial No, Model, Graphic Card..."
         className="border p-2 rounded w-full mb-4"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -152,6 +153,7 @@ export default function LaptopInventory() {
               <th className="p-3 text-left w-[10%]">CPU</th>
               <th className="p-3 text-left w-[10%]">RAM</th>
               <th className="p-3 text-left w-[10%]">Storage</th>
+              <th className="p-3 text-left w-[10%]">Graphic Card</th>
               <th className="p-3 text-left w-[15%]">Current Location</th>
               <th className="p-3 text-center w-[10%]">Actions</th>
             </tr>
@@ -171,6 +173,7 @@ export default function LaptopInventory() {
                 <td className="p-3">{laptop.cpu || "-"}</td>
                 <td className="p-3">{laptop.ram || "-"}</td>
                 <td className="p-3">{laptop.ssdHdd || "-"}</td>
+                <td className="p-3">{laptop.graphiccard || "-"}</td>
                 <td className="p-3 font-medium text-blue-700">
                   {laptop.current_location}
                 </td>
