@@ -127,6 +127,7 @@ export default function Reports() {
     item.serialNo?.toLowerCase().includes(lowerSearch) ||
     item.tested_by?.toLowerCase().includes(lowerSearch) ||
     item.model?.toLowerCase().includes(lowerSearch) ||
+    item.gen?.toLowerCase().includes(lowerSearch) ||
     item.graphiccard?.toLowerCase().includes(lowerSearch)
   );
 
@@ -408,7 +409,7 @@ const exportToExcel = async () => {
       {/* 🔍 ADDED: Search Input */}
       <input
         type="text"
-        placeholder="Search by M. Code, Serial No, Model, Graphic Card..."
+        placeholder="Search by M. Code, Serial No, Model, Graphic Card, Gen..."
         className="border p-2 rounded w-full mb-3 focus:ring-blue-500 focus:border-blue-500"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -439,6 +440,7 @@ const exportToExcel = async () => {
               <th className="p-3 text-left">Serial No</th>
               <th className="p-3 text-left">Model</th>
               <th className="p-3 text-left">CPU</th>
+              <th className="p-3 text-left">Genration</th>
               <th className="p-3 text-left">RAM</th>
               <th className="p-3 text-left">Storage</th>
               <th className="p-3 text-left">Graphic Card</th>
@@ -462,6 +464,7 @@ const exportToExcel = async () => {
                 <td className="p-3">{r.serialNo}</td>
                 <td className="p-3">{r.model}</td>
                 <td className="p-3">{r.cpu}</td>
+                <td className="p-3">{r.gen}</td>
                 <td className="p-3">{r.ram}</td>
                 <td className="p-3">{r.ssdHdd}</td>
                 <td className="p-3">{r.graphiccard}</td>

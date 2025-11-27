@@ -127,6 +127,7 @@ export default function LaptopInventory() {
     item.mashincode?.toString().includes(search.toLowerCase()) ||
     item.serialNo?.toLowerCase().includes(search.toLowerCase()) ||
     item.model?.toLowerCase().includes(search.toLowerCase()) ||
+    item.gen?.toLowerCase().includes(search.toLowerCase()) ||
     item.graphiccard?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -137,7 +138,7 @@ export default function LaptopInventory() {
       {/* ✅ SEARCH BAR */}
       <input
         type="text"
-        placeholder="Search: M. Code, Serial No, Model, Graphic Card..."
+        placeholder="Search: M. Code, Serial No, Model, Graphic Card, Gen..."
         className="border p-2 rounded w-full mb-4"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -151,6 +152,7 @@ export default function LaptopInventory() {
               <th className="p-3 text-left w-[15%]">Serial No</th>
               <th className="p-3 text-left w-[15%]">Model</th>
               <th className="p-3 text-left w-[10%]">CPU</th>
+              <th className="p-3 text-left w-[10%]">Genration</th>
               <th className="p-3 text-left w-[10%]">RAM</th>
               <th className="p-3 text-left w-[10%]">Storage</th>
               <th className="p-3 text-left w-[10%]">Graphic Card</th>
@@ -171,6 +173,7 @@ export default function LaptopInventory() {
                 <td className="p-3">{laptop.serialNo || "-"}</td>
                 <td className="p-3">{laptop.model || "-"}</td>
                 <td className="p-3">{laptop.cpu || "-"}</td>
+                <td className="p-3">{laptop.gen || "-"}</td>
                 <td className="p-3">{laptop.ram || "-"}</td>
                 <td className="p-3">{laptop.ssdHdd || "-"}</td>
                 <td className="p-3">{laptop.graphiccard || "-"}</td>
