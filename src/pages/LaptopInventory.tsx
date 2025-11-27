@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 export default function LaptopInventory() {
   const [laptops, setLaptops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");   // ✅ NEW
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function LaptopInventory() {
       return;
     }
 
-    // ✅ Attach latest transfer info
+    // Attach latest transfer info
     const enriched = await Promise.all(
       (laptopsData || []).map(async (lap) => {
         const { data: transfer } = await supabase
@@ -51,83 +52,95 @@ export default function LaptopInventory() {
   };
 
   const handleTransfer = async (laptop: any, type: string) => {
-  if (!type) return;
+    if (!type) return;
 
-  // 🔒 Step 1: Prevent transfer if laptop is not in Main Warehouse
-  if (laptop.current_location !== "Main Warehouse" && type !== "Return to Warehouse") {
-    toast.error(
-      `❌ ${laptop.serialNo} is currently at ${laptop.current_location}. It must return to Main Warehouse before transferring again.`
-    );
-    return;
-  }
+    if (laptop.current_location !== "Main Warehouse" && type !== "Return to Warehouse") {
+      toast.error(
+        `❌ ${laptop.serialNo} is currently at ${laptop.current_location}. It must return to Main Warehouse before transferring again.`
+      );
+      return;
+    }
 
-  try {
-    // ✅ Instant transfer for FTT Retail
-    if (type === "FTT Retail") {
-      const { data: existing, error: checkError } = await supabase
-        .from("transfers")
-        .select("id")
-        .eq("laptop_id", laptop.id)
-        .eq("to_location", "FTT Retail")
-        .limit(1);
+    try {
+      if (type === "FTT Retail") {
+        const { data: existing, error: checkError } = await supabase
+          .from("transfers")
+          .select("id")
+          .eq("laptop_id", laptop.id)
+          .eq("to_location", "FTT Retail")
+          .limit(1);
 
-      if (checkError) throw checkError;
+        if (checkError) throw checkError;
 
-      if (existing && existing.length > 0) {
-        toast.error(`⚠️ ${laptop.serialNo} already transferred to FTT Retail.`);
+        if (existing && existing.length > 0) {
+          toast.error(`⚠️ ${laptop.serialNo} already transferred to FTT Retail.`);
+          return;
+        }
+
+        const { error } = await supabase.from("transfers").insert({
+          laptop_id: laptop.id,
+          transfer_type: "retail",
+          to_location: "FTT Retail",
+          from_location: laptop.current_location || "Main Warehouse",
+          transfer_date: new Date().toISOString(),
+        });
+
+        if (error) throw error;
+        toast.success(`${laptop.serialNo} transferred to FTT Retail ✅`);
+        fetchLaptops();
         return;
       }
 
-      const { error } = await supabase.from("transfers").insert({
-        laptop_id: laptop.id,
-        transfer_type: "retail",
-        to_location: "FTT Retail",
-        from_location: laptop.current_location || "Main Warehouse",
-        transfer_date: new Date().toISOString(),
-      });
+      if (type === "Return to Warehouse") {
+        const { error } = await supabase.from("transfers").insert({
+          laptop_id: laptop.id,
+          transfer_type: "warehouse",
+          to_location: "Main Warehouse",
+          from_location: laptop.current_location,
+          transfer_date: new Date().toISOString(),
+        });
 
-      if (error) throw error;
-      toast.success(`${laptop.serialNo} transferred to FTT Retail ✅`);
-      fetchLaptops();
-      return;
+        if (error) throw error;
+        toast.success(`${laptop.serialNo} returned to Main Warehouse ✅`);
+        fetchLaptops();
+        return;
+      }
+
+      const normalizedType =
+        type === "Godown Sale"
+          ? "godown"
+          : type === "Purchase Return to Dealer"
+          ? "purchase_return"
+          : type.toLowerCase();
+
+      navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
+    } catch (err: any) {
+      toast.error("Error transferring: " + err.message);
+      console.error(err);
     }
-
-    // ✅ Allow "Return to Warehouse" from other locations
-    if (type === "Return to Warehouse") {
-      const { error } = await supabase.from("transfers").insert({
-        laptop_id: laptop.id,
-        transfer_type: "warehouse",
-        to_location: "Main Warehouse",
-        from_location: laptop.current_location,
-        transfer_date: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-      toast.success(`${laptop.serialNo} returned to Main Warehouse ✅`);
-      fetchLaptops();
-      return;
-    }
-
-    // ✅ For other transfer types, open transfer form
-    const normalizedType =
-      type === "Godown Sale"
-        ? "godown"
-        : type === "Purchase Return to Dealer"
-        ? "purchase_return"
-        : type.toLowerCase();
-
-    navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
-  } catch (err: any) {
-    toast.error("Error transferring: " + err.message);
-    console.error(err);
-  }
-};
+  };
 
   if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
+
+  // ✅ FILTERED LIST (New)
+  const filteredLaptops = laptops.filter((item) =>
+    item.mashincode?.toString().includes(search.toLowerCase()) ||
+    item.serialNo?.toLowerCase().includes(search.toLowerCase()) ||
+    item.model?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-4">💻 Laptop Inventory</h1>
+
+      {/* ✅ SEARCH BAR */}
+      <input
+        type="text"
+        placeholder="Search: M. Code, Serial No, Model..."
+        className="border p-2 rounded w-full mb-4"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
 
       <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border border-gray-200">
         <table className="min-w-full text-sm text-gray-800">
@@ -145,7 +158,7 @@ export default function LaptopInventory() {
           </thead>
 
           <tbody>
-            {laptops.map((laptop, i) => (
+            {filteredLaptops.map((laptop, i) => (
               <tr
                 key={laptop.id}
                 className={`${
@@ -169,13 +182,16 @@ export default function LaptopInventory() {
                     <option value="">Transfer...</option>
                     <option value="FTT Retail">FTT Retail</option>
                     <option value="Godown Sale">Godown Sale</option>
-                    <option value="Purchase Return to Dealer">Purchase Return to Dealer</option>
+                    <option value="Purchase Return to Dealer">
+                      Purchase Return to Dealer
+                    </option>
                     <option value="Return to Warehouse">Return to Warehouse</option>
                   </select>
                 </td>
               </tr>
             ))}
           </tbody>
+
         </table>
       </div>
     </div>

@@ -13,6 +13,7 @@ export default function Reports() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const [search, setSearch] = useState(""); // <-- ADDED: Search state
   const [user, setUser] = useState<any>(() => {
     const cached = localStorage.getItem("user");
     return cached ? JSON.parse(cached) : null;
@@ -74,7 +75,7 @@ export default function Reports() {
 
   const canExport =
     user?.email === "praveenyadav4u@gmail.com" ||
-    user?.email === "adnan@gmail.com";
+    user?.email === "adnan@gmail.com" ||
     user?.email === "fttpvtltd@gmail.com";
 
   // ✅ Step 2: Load reports + profiles when user ready
@@ -118,6 +119,14 @@ export default function Reports() {
   if (!user || loading) {
     return <p className="p-6 text-gray-500">Loading reports...</p>;
   }
+
+  // ✅ Filtering logic using the search state
+  const lowerSearch = search.toLowerCase();
+  const filteredReports = reports.filter((item) =>
+    item.mashincode?.toString().toLowerCase().includes(lowerSearch) ||
+    item.serialNo?.toLowerCase().includes(lowerSearch) ||
+    item.model?.toLowerCase().includes(lowerSearch)
+  );
 
   // ✅ Toggle selection for checkboxes
   const toggleSelect = (id: string) => {
@@ -376,7 +385,8 @@ const exportToExcel = async () => {
           <button
   onClick={() => {
     if (selectedReports.length === 0) {
-      alert("⚠️ Please select at least one report to print QR stickers.");
+      // Replaced alert with toast as per guidelines
+      toast.error("⚠️ Please select at least one report to print QR stickers.");
       return;
     }
     printQRSticker(selectedReports);
@@ -393,6 +403,16 @@ const exportToExcel = async () => {
         </div>
       </div>
 
+      {/* 🔍 ADDED: Search Input */}
+      <input
+        type="text"
+        placeholder="Search by M. Code, Serial No, Model..."
+        className="border p-2 rounded w-full mb-3 focus:ring-blue-500 focus:border-blue-500"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      {/* 🔍 END Search Input */}
+
       <div className="overflow-x-auto bg-white rounded-xl shadow border">
         <table className="min-w-full text-sm text-gray-800">
           <thead className="bg-gray-200">
@@ -401,11 +421,16 @@ const exportToExcel = async () => {
                 <input
                   type="checkbox"
                   onChange={(e) =>
+                    // When clicking "Select All", it now only selects items in the filtered view
                     setSelected(
-                      e.target.checked ? reports.map((r) => r.id) : []
+                      e.target.checked ? filteredReports.map((r) => r.id) : []
                     )
                   }
-                  checked={selected.length === reports.length}
+                  // Check if all visible reports are currently selected
+                  checked={
+                    filteredReports.length > 0 && 
+                    filteredReports.every(r => selected.includes(r.id))
+                  }
                 />
               </th>
               <th className="p-3 text-left">M. Code</th>
@@ -420,7 +445,8 @@ const exportToExcel = async () => {
             </tr>
           </thead>
           <tbody>
-            {reports.map((r) => (
+            {/* CORRECTED: The syntax error was here (an extra brace {) */}
+            {filteredReports.map((r) => (
               <tr key={r.id} className="border-t hover:bg-gray-50">
                 <td className="p-3">
                   <input
@@ -459,6 +485,22 @@ const exportToExcel = async () => {
                 </td>
               </tr>
             ))}
+            {/* Display message if no results found */}
+            {filteredReports.length === 0 && reports.length > 0 && (
+                <tr>
+                    <td colSpan={10} className="p-5 text-center text-gray-500">
+                        No reports found matching your search term.
+                    </td>
+                </tr>
+            )}
+            {/* Display message if reports array is empty */}
+            {reports.length === 0 && (
+                <tr>
+                    <td colSpan={10} className="p-5 text-center text-gray-500">
+                        There are no reports available yet.
+                    </td>
+                </tr>
+            )}
           </tbody>
         </table>
       </div>
