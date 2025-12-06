@@ -109,17 +109,24 @@ export default function Dashboard() {
         // -------------------------
         // 6) Model counts
         // -------------------------
-        const { data: invModels } = await supabase.from("inventory").select("model");
+        const { data: testModels } = await supabase
+          .from("laptop_tests")
+          .select("model");
+
         if (mounted) {
           const map = new Map<string, number>();
-          (invModels || []).forEach((row: any) => {
-            const name = (row.model || "Unknown").toString();
-            map.set(name, (map.get(name) || 0) + 1);
+
+          (testModels || []).forEach((row) => {
+            const model = (row.model || "Unknown").toString().trim();
+            if (!model) return;
+            map.set(model, (map.get(model) || 0) + 1);
           });
-          const arr: ModelCount[] = Array.from(map.entries())
+
+          const arr = Array.from(map.entries())
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 8);
+
           setModelCounts(arr);
         }
       } catch (err: any) {
@@ -227,8 +234,8 @@ export default function Dashboard() {
           </ul>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <h4 className="font-medium">Notes</h4>
-          <p className="text-sm text-gray-600">Stock is computed as <code>In Stock = Total Tests - Total Transfers - Total Returns</code>. Returns are counted from transfers with type <code>purchase_return</code> or <code>to_location = 'Purchase Return to Dealer'</code>.</p>
+          {/*<h4 className="font-medium">Notes</h4>
+          <p className="text-sm text-gray-600">Stock is computed as <code>In Stock = Total Tests - Total Transfers - Total Returns</code>. Returns are counted from transfers with type <code>purchase_return</code> or <code>to_location = 'Purchase Return to Dealer'</code>.</p>*/}
         </div>
       </div>
     </div>
