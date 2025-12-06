@@ -61,6 +61,7 @@ type LaptopForm = {
   driveri: boolean;
   softi: boolean;
   dl: boolean;
+  warranty: string;
   photoshoot: boolean;
   remarks: string;
 };
@@ -300,7 +301,9 @@ window.location.href = "/login"; */}
   ))}
 </div>
 
-
+{/*warranty*/}
+        <h3 className="text-lg font-semibold">Warranty Check</h3>
+        <textarea {...register("warranty")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
         {/* 🔹 Remarks */}
         <h3 className="text-lg font-semibold">Remarks</h3>
         <textarea {...register("remarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
