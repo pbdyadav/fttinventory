@@ -13,7 +13,7 @@ import Transfer from "@/pages/InventoryTransfer";
 import Returns from "@/pages/Returns";
 import Reports from "@/pages/Reports";
 import EditReport from "@/pages/EditReport";
-
+import CreateInvoice from "@/pages/CreateInvoice";
 import Navbar from "@/components/Navbar";
 import AutoLogout from "@/components/AutoLogout";
 
@@ -153,6 +153,14 @@ export default function App() {
             element={
               <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
                 <EditReport />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/invoice/:id"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <CreateInvoice />
               </PrivateRoute>
             }
           />

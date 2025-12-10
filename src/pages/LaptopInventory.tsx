@@ -20,8 +20,10 @@ export default function LaptopInventory() {
 
     const { data: laptopsData, error } = await supabase
       .from("laptop_tests")
-      .select("*")
+      .select("id, mashincode, serialNo, model, cpu, gen, ram, ssdHdd, graphiccard, status, created_at")
+      
       .order("created_at", { ascending: false });
+
 
     if (error) {
       toast.error("Error fetching laptops: " + error.message);
@@ -52,16 +54,29 @@ export default function LaptopInventory() {
   };
 
   const handleTransfer = async (laptop: any, type: string) => {
-    if (!type) return;
 
-    if (laptop.current_location !== "Main Warehouse" && type !== "Return to Warehouse") {
-      toast.error(
-        `❌ ${laptop.serialNo} is currently at ${laptop.current_location}. It must return to Main Warehouse before transferring again.`
-      );
+    // Normalize sale option
+    const isSale = type === "Sale (Invoice)";
+
+    // ✅ Allow SALE from ANY location
+    if (isSale) {
+      navigate(`/invoice/${laptop.id}`);
       return;
     }
 
+    // Stop if no selection
+    if (!type) return;
+
+    // ❌ Remove warehouse restriction for Sale
+if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" && type !== "Return to Warehouse") {
+  toast.error(
+    `${laptop.serialNo} is currently at ${laptop.current_location}. It must return to Main Warehouse before transferring again.`
+  );
+  return;
+}
+
     try {
+      // --- FTT RETAIL ---
       if (type === "FTT Retail") {
         const { data: existing, error: checkError } = await supabase
           .from("transfers")
@@ -91,6 +106,7 @@ export default function LaptopInventory() {
         return;
       }
 
+      // --- RETURN TO WAREHOUSE ---
       if (type === "Return to Warehouse") {
         const { error } = await supabase.from("transfers").insert({
           laptop_id: laptop.id,
@@ -106,12 +122,13 @@ export default function LaptopInventory() {
         return;
       }
 
+      // --- PURCHASE RETURN / GODOWN ---
       const normalizedType =
         type === "Godown Sale"
           ? "godown"
           : type === "Purchase Return to Dealer"
-          ? "purchase_return"
-          : type.toLowerCase();
+            ? "purchase_return"
+            : type.toLowerCase();
 
       navigate(`/transfer/${laptop.id}`, { state: { type, normalizedType } });
     } catch (err: any) {
@@ -119,6 +136,7 @@ export default function LaptopInventory() {
       console.error(err);
     }
   };
+
 
   if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
 
@@ -165,9 +183,8 @@ export default function LaptopInventory() {
             {filteredLaptops.map((laptop, i) => (
               <tr
                 key={laptop.id}
-                className={`${
-                  i % 2 === 0 ? "bg-white" : "bg-gray-50"
-                } hover:bg-amber-50 transition`}
+                className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                  } hover:bg-amber-50 transition`}
               >
                 <td className="p-3 font-medium">{laptop.mashincode || "-"}</td>
                 <td className="p-3">{laptop.serialNo || "-"}</td>
@@ -178,7 +195,15 @@ export default function LaptopInventory() {
                 <td className="p-3">{laptop.ssdHdd || "-"}</td>
                 <td className="p-3">{laptop.graphiccard || "-"}</td>
                 <td className="p-3 font-medium text-blue-700">
-                  {laptop.current_location}
+                  <td className="p-3 font-medium">
+                    {laptop.status === "sold" ? (
+                      <span className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded">
+                        SOLD
+                      </span>
+                    ) : (
+                      <span className="text-blue-700">{laptop.current_location}</span>
+                    )}
+                  </td>
                 </td>
                 <td className="p-3 text-center">
                   <select
@@ -188,9 +213,8 @@ export default function LaptopInventory() {
                     <option value="">Transfer...</option>
                     <option value="FTT Retail">FTT Retail</option>
                     <option value="Godown Sale">Godown Sale</option>
-                    <option value="Purchase Return to Dealer">
-                      Purchase Return to Dealer
-                    </option>
+                    <option value="Sale (Invoice)">Sale (Invoice)</option>
+                    <option value="Purchase Return to Dealer">Purchase Return to Dealer</option>
                     <option value="Return to Warehouse">Return to Warehouse</option>
                   </select>
                 </td>
