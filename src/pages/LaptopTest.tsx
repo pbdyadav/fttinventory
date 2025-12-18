@@ -276,6 +276,7 @@ window.location.href = "/login"; */}
             <option>12 GB</option>
             <option>16 GB</option>
             <option>20 GB</option>
+            <option>24 GB</option>
             <option>32 GB</option>
             <option>40 GB</option>
             <option>64 GB</option>
