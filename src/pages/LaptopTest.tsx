@@ -24,7 +24,7 @@ type LaptopForm = {
   displaybrack: boolean;
   screenpatches: boolean;
   keyboardmarks: boolean;
-  
+
   hingesok: boolean;
   hingesh: boolean;
   hingesl: boolean;
@@ -54,7 +54,7 @@ type LaptopForm = {
   Dpanel: string;
   brightness: boolean;
   volume: boolean;
-  bt: boolean;
+  Bluetooth: boolean;
   fpl: boolean;
   bl: boolean;
   sr: boolean;
@@ -76,91 +76,96 @@ const LaptopTest = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Fetch next machine code on mount
- // Fetch next machine code on mount
-useEffect(() => {
-  const fetchNextCode = async () => {
-    try {
-      const { data, error } = await supabase.rpc("get_next_machine_code");
+  // Fetch next machine code on mount
+  useEffect(() => {
+    const fetchNextCode = async () => {
+      try {
+        const { data, error } = await supabase.rpc("get_next_machine_code");
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const nextCode = data || 101;
-      setNextMachineCode(nextCode);
-      setValue("mashincode", nextCode);
-    } catch (err: any) {
-      console.error("Error fetching machine code:", err.message);
-      toast.error("Failed to fetch next machine code.");
-      setNextMachineCode(101);
-      setValue("mashincode", 101);
-    }
-  };
+        const nextCode = data || 101;
+        setNextMachineCode(nextCode);
+        setValue("mashincode", nextCode);
+      } catch (err: any) {
+        console.error("Error fetching machine code:", err.message);
+        toast.error("Failed to fetch next machine code.");
+        setNextMachineCode(101);
+        setValue("mashincode", 101);
+      }
+    };
 
-  fetchNextCode();
+    fetchNextCode();
 
-  // ✅ Set test date and tester (moved inside same effect)
-  const now = new Date();
-  setTestDate(now.toISOString().slice(0, 10));
+    // ✅ Set test date and tester (moved inside same effect)
+    const now = new Date();
+    setTestDate(now.toISOString().slice(0, 10));
 
-  supabase.auth.getUser().then(({ data }) => {
-    setTestedBy(data?.user?.email || "");
-  });
-}, [setValue]);
+    supabase.auth.getUser().then(({ data }) => {
+      setTestedBy(data?.user?.email || "");
+    });
+  }, [setValue]);
 
-  
+
   // ✅ Handle form submit + auto add to inventory
   const onSubmit = async (data: LaptopForm) => {
-  try {
-    // ✅ Check for duplicate serial number before inserting
-    const { data: existing, error: dupError } = await supabase
-      .from("laptop_tests")
-      .select("id")
-      .eq("serialNo", data.serialNo);
+    try {
+      // ✅ Check for duplicate serial number before inserting
+      const { data: existing, error: dupError } = await supabase
+        .from("laptop_tests")
+        .select("id")
+        .eq("serialNo", data.serialNo);
 
-    if (dupError) throw dupError;
-    if (existing && existing.length > 0) {
-      alert("❌ Serial number already exists — duplicate entry prevented!");
-      return;
-    }
+      if (dupError) throw dupError;
+      if (existing && existing.length > 0) {
+        alert("❌ Serial number already exists — duplicate entry prevented!");
+        return;
+      }
 
       // ✅ Save Laptop Test — add tested_by & tested_on
-      const { error: testError } = await supabase.from("laptop_tests").insert([
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { error } = await supabase.from("laptop_tests").insert([
         {
           ...data,
-          tested_by: user?.id || user?.email || "unknown",
+          tested_by: user?.id ?? null, // ✅ UUID only
           tested_on: new Date().toISOString(),
         },
       ]);
-      if (testError) throw testError;
 
-     // ✅ Auto-add to Inventory (if not exists)
-    const { data: invExists } = await supabase
-      .from("inventory")
-      .select("id")
-      .eq("serialNo", data.serialNo);
+      if (error) throw error;
 
-    if (!invExists || invExists.length === 0) {
-      const inventoryData = {
-        mashincode: data.mashincode,
-        model: data.model,
-        serialNo: data.serialNo,
-        os: data.os,
-        cpu: data.cpu,
-        ram: data.ram,
-        storage: data.ssdHdd,
-        ssdHealth: data.ssdHealth,
-        touch: data.touch,
-        displaysize: data.displaysize,
-        typesofscreenresolutions: statusbar.typesofscreenresolutions,
-        graphiccard: data.graphiccard,
-        location: "Warehouse A",
-        quantity: 1,
-        status: "In Stock",
-      };
-      const { error: invError } = await supabase.from("inventory").insert([inventoryData]);
-      if (invError) throw invError;
-    }
+      // ✅ Auto-add to Inventory (if not exists)
+      const { data: invExists } = await supabase
+        .from("inventory")
+        .select("id")
+        .eq("serialNo", data.serialNo);
 
-    
+      if (!invExists || invExists.length === 0) {
+        const inventoryData = {
+          mashincode: data.mashincode,
+          model: data.model,
+          serialNo: data.serialNo,
+          os: data.os,
+          cpu: data.cpu,
+          ram: data.ram,
+          storage: data.ssdHdd,
+          ssdHealth: data.ssdHealth,
+          touch: data.touch,
+          displaysize: data.displaysize,
+          typesofscreenresolutions: statusbar.typesofscreenresolutions,
+          graphiccard: data.graphiccard,
+          location: "Warehouse A",
+          quantity: 1,
+          status: "In Stock",
+        };
+        const { error: invError } = await supabase.from("inventory").insert([inventoryData]);
+        if (invError) throw invError;
+      }
+
+
       // 2️⃣ Auto-add to Inventory
       const inventoryData = {
         mashincode: data.mashincode,
@@ -389,14 +394,14 @@ window.location.href = "/login"; */}
           {[
             { key: "brightness", label: "Brightness + / -" },
             { key: "volume", label: "Volume + / -" },
-            { key: "bt", label: "Bluetooth" },
+            { key: "Bluetooth", label: "Bluetooth" },
             { key: "fpl", label: "Fingerprint Lock" },
             { key: "bl", label: "Backlight" },
             { key: "sr", label: "Screen Rotate" },
             { key: "driveri", label: "Driver Installation" },
             { key: "softi", label: "Software Installation" },
             { key: "dl", label: "Digital License Check" },
-            
+
           ].map(({ key, label }) => (
             <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} /> {label}</label>
           ))}
@@ -418,10 +423,10 @@ window.location.href = "/login"; */}
         </button>
         {/* ✅ Show QR Code after saving */}
         {qrUrl && (
-        <div className="mt-4 p-3 bg-white rounded border inline-block">
-        <div className="text-sm mb-2 text-gray-700">QR Code for this report:</div>
-        <img src={qrUrl} alt="QR Code" className="w-44 h-44" />
-        </div>
+          <div className="mt-4 p-3 bg-white rounded border inline-block">
+            <div className="text-sm mb-2 text-gray-700">QR Code for this report:</div>
+            <img src={qrUrl} alt="QR Code" className="w-44 h-44" />
+          </div>
 
         )}
       </form>

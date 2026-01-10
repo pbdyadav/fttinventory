@@ -289,7 +289,7 @@ window.location.href = "/login"; */}
   {[
     { key: "brightness", label: "Brightness + / -" },
     { key: "volume", label: "Volume + / -" },
-    { key: "bt", label: "Bluetooth" },
+    { key: "Bluetooth", label: "Bluetooth" },
     { key: "fpl", label: "Fingerprint Lock" },
     { key: "bl", label: "Backlight" },
     { key: "sr", label: "Screen Rotate" },
