@@ -18,7 +18,7 @@ type LaptopForm = {
 
   graphiccard: string;
   graphicmodel: string;
-  displaydotsA: boolean;
+  AvailableDeadPixels: boolean;
   displaydots: boolean;
   screenlightshadow: boolean;
   displaybrack: boolean;

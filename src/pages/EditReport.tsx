@@ -20,8 +20,8 @@ type LaptopForm = {
   typesofscreenresolutions: string;
   graphiccard: string;
   graphicmodel: string;
-  displaydotsA: boolean;
-  displaydots: boolean;
+  AvailableDeadPixels: boolean;
+  NoDeadPixels: boolean;
   screenlightshadow: boolean;
   displaybrack: boolean;
   screenpatches: boolean;
@@ -230,8 +230,8 @@ window.location.href = "/login"; */}
         {/* 🔹 Display Tests */}
 <h3 className="text-lg font-semibold mt-6 mb-2">Display Tests</h3>
 <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
-  <label><input type="checkbox" {...register("displaydotsA")} className="mr-2" /> Available Dead Pixels</label>
-  <label><input type="checkbox" {...register("displaydots")} className="mr-2" /> No Dead Pixels</label>
+  <label><input type="checkbox" {...register("AvailableDeadPixels")} className="mr-2" /> Available Dead Pixels</label>
+  <label><input type="checkbox" {...register("NoDeadPixels")} className="mr-2" /> No Dead Pixels</label>
   <label><input type="checkbox" {...register("screenlightshadow")} className="mr-2" /> Showing Light Shadow on Screen</label>
   <label><input type="checkbox" {...register("displaybrack")} className="mr-2" /> Display Broken</label>
   <label><input type="checkbox" {...register("screenpatches")} className="mr-2" /> Screen Patches</label>
