@@ -22,13 +22,13 @@ type LaptopForm = {
   graphicmodel: string;
   AvailableDeadPixels: boolean;
   NoDeadPixels: boolean;
-  screenlightshadow: boolean;
-  displaybrack: boolean;
-  screenpatches: boolean;
-  keyboardmarks: boolean;
-  hingesok: boolean;
-  hingesh: boolean;
-  hingesl: boolean;
+  ShowingLightShadowonScreen: boolean;
+  DisplayBroken: boolean;
+  ScreenPatches: boolean;
+  KeyboardMarks: boolean;
+  HingesOK: boolean;
+  HingesHard: boolean;
+  HingesLoose: boolean;
   batteryhealth: string;
   batteryreading: string;
   hdmiport: boolean;
@@ -232,13 +232,13 @@ window.location.href = "/login"; */}
 <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
   <label><input type="checkbox" {...register("AvailableDeadPixels")} className="mr-2" /> Available Dead Pixels</label>
   <label><input type="checkbox" {...register("NoDeadPixels")} className="mr-2" /> No Dead Pixels</label>
-  <label><input type="checkbox" {...register("screenlightshadow")} className="mr-2" /> Showing Light Shadow on Screen</label>
-  <label><input type="checkbox" {...register("displaybrack")} className="mr-2" /> Display Broken</label>
-  <label><input type="checkbox" {...register("screenpatches")} className="mr-2" /> Screen Patches</label>
-  <label><input type="checkbox" {...register("keyboardmarks")} className="mr-2" /> Keyboard Marks</label>
-  <label><input type="checkbox" {...register("hingesok")} className="mr-2" /> Hinges OK</label>
-  <label><input type="checkbox" {...register("hingesh")} className="mr-2" /> Hinges Hard</label>
-  <label><input type="checkbox" {...register("hingesl")} className="mr-2" /> Hinges Loose</label>
+  <label><input type="checkbox" {...register("ShowingLightShadowonScreen")} className="mr-2" /> Showing Light Shadow on Screen</label>
+  <label><input type="checkbox" {...register("DisplayBroken")} className="mr-2" /> Display Broken</label>
+  <label><input type="checkbox" {...register("ScreenPatches")} className="mr-2" /> Screen Patches</label>
+  <label><input type="checkbox" {...register("KeyboardMarks")} className="mr-2" /> Keyboard Marks</label>
+  <label><input type="checkbox" {...register("HingesOK")} className="mr-2" /> Hinges OK</label>
+  <label><input type="checkbox" {...register("HingesHard")} className="mr-2" /> Hinges Hard</label>
+  <label><input type="checkbox" {...register("HingesLoose")} className="mr-2" /> Hinges Loose</label>
 </div>
 
 {/* 🔹 Battery */}
