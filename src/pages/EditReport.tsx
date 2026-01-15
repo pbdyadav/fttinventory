@@ -13,7 +13,7 @@ type LaptopForm = {
   Gen: string;
   CPU: string;
   RAM: string;
-  ssdHdd: string;
+  SSDHdd: string;
   SSDHealth: string;
   touch: string;
   DisplaySize: string;
@@ -181,7 +181,7 @@ window.location.href = "/login"; */}
             <option>64 GB</option>
             <option>128 GB</option>
           </select>
-          <select {...register("ssdHdd")} className="w-full border p-2 rounded">
+          <select {...register("SSDHdd")} className="w-full border p-2 rounded">
             <option value="">Select Storage</option>
             <option>128GB SSD</option>
             <option>256GB SSD</option>

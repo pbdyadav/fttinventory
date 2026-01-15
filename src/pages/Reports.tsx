@@ -182,7 +182,7 @@ useEffect(() => {
         model: test.model,
         cpu: test.cpu,
         ram: test.ram,
-        ssdHdd: test.ssdHdd,
+        SSDHdd: test.SSDHdd,
         testedBy: testerName,
         testedDate: new Date(testedOn).toLocaleDateString(),
       })
@@ -323,7 +323,7 @@ useEffect(() => {
         Gen: r.gen,
         CPU: r.cpu,
         RAM: r.ram,
-        Storage: r.ssdHdd,
+        Storage: r.SSDHdd,
         SSDHealth: r.ssdHealth,
         TestedBy: getTesterName(r.tested_by),
         TestedDate: new Date(r.created_at).toLocaleString(),
@@ -453,14 +453,14 @@ useEffect(() => {
                     onChange={() => toggleSelect(r.id)}
                   />
                 </td>
-                <td className="p-3">{r.mashincode}</td>
-                <td className="p-3">{r.serialNo}</td>
-                <td className="p-3">{r.model}</td>
-                <td className="p-3">{r.cpu}</td>
-                <td className="p-3">{r.gen}</td>
-                <td className="p-3">{r.ram}</td>
-                <td className="p-3">{r.ssdHdd}</td>
-                <td className="p-3">{r.graphiccard}</td>
+                <td className="p-3">{r.MashinCode}</td>
+                <td className="p-3">{r.SerialNo}</td>
+                <td className="p-3">{r.Model}</td>
+                <td className="p-3">{r.CPU}</td>
+                <td className="p-3">{r.Gen}</td>
+                <td className="p-3">{r.RAM}</td>
+                <td className="p-3">{r.SSDHdd}</td>
+                <td className="p-3">{r.GraphicCard}</td>
                 <td className="p-3">{getTesterName(r.tested_by)}</td>
                 <td className="p-3">{new Date(r.created_at).toLocaleDateString()} </td>
                 <td className="p-3 text-center flex justify-center gap-2">

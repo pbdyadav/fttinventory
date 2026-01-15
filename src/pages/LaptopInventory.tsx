@@ -20,7 +20,7 @@ export default function LaptopInventory() {
 
     const { data: laptopsData, error } = await supabase
       .from("laptop_tests")
-      .select("id, mashincode, serialNo, model, cpu, gen, ram, ssdHdd, graphiccard, status, created_at")
+      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, GraphicCard, status, created_at")
       
       .order("created_at", { ascending: false });
 
@@ -142,11 +142,11 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
 
   // ✅ FILTERED LIST (New)
   const filteredLaptops = laptops.filter((item) =>
-    item.mashincode?.toString().includes(search.toLowerCase()) ||
-    item.serialNo?.toLowerCase().includes(search.toLowerCase()) ||
-    item.model?.toLowerCase().includes(search.toLowerCase()) ||
-    item.gen?.toLowerCase().includes(search.toLowerCase()) ||
-    item.graphiccard?.toLowerCase().includes(search.toLowerCase())
+    item.MashinCode?.toString().includes(search.toLowerCase()) ||
+    item.SerialNo?.toLowerCase().includes(search.toLowerCase()) ||
+    item.Model?.toLowerCase().includes(search.toLowerCase()) ||
+    item.Gen?.toLowerCase().includes(search.toLowerCase()) ||
+    item.GraphicCard?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -186,14 +186,14 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
                 className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"
                   } hover:bg-amber-50 transition`}
               >
-                <td className="p-3 font-medium">{laptop.mashincode || "-"}</td>
-                <td className="p-3">{laptop.serialNo || "-"}</td>
-                <td className="p-3">{laptop.model || "-"}</td>
-                <td className="p-3">{laptop.cpu || "-"}</td>
-                <td className="p-3">{laptop.gen || "-"}</td>
-                <td className="p-3">{laptop.ram || "-"}</td>
-                <td className="p-3">{laptop.ssdHdd || "-"}</td>
-                <td className="p-3">{laptop.graphiccard || "-"}</td>
+                <td className="p-3 font-medium">{laptop.MashinCode || "-"}</td>
+                <td className="p-3">{laptop.SerialNo || "-"}</td>
+                <td className="p-3">{laptop.Model || "-"}</td>
+                <td className="p-3">{laptop.CPU || "-"}</td>
+                <td className="p-3">{laptop.Gen || "-"}</td>
+                <td className="p-3">{laptop.RAM || "-"}</td>
+                <td className="p-3">{laptop.SSDHdd || "-"}</td>
+                <td className="p-3">{laptop.GraphicCard || "-"}</td>
                 <td className="p-3 font-medium text-blue-700">
                   <td className="p-3 font-medium">
                     {laptop.status === "sold" ? (

@@ -10,7 +10,7 @@ type LaptopForm = {
   Gen: string;
   CPU: string;
   RAM: string;
-  ssdHdd: string;
+  SSDHdd: string;
   SSDHealth: string;
   touch: string;
   DisplaySize: string;
@@ -145,18 +145,18 @@ const LaptopTest = () => {
 
       if (!invExists || invExists.length === 0) {
         const inventoryData = {
-          mashincode: data.MashinCode,
-          model: data.Model,
-          serialNo: data.SerialNo,
-          os: data.OS,
-          cpu: data.CPU,
+          MashinCode: data.MashinCode,
+          Model: data.Model,
+          SerialNo: data.SerialNo,
+          OS: data.OS,
+          CPU: data.CPU,
           RAM: data.RAM,
-          storage: data.ssdHdd,
+          storage: data.SSDHdd,
           SSDHealth: data.SSDHealth,
           touch: data.touch,
-          displaysize: data.DisplaySize,
+          DisplaySize: data.DisplaySize,
           ScreenResolutions: statusbar.ScreenResolutions,
-          graphiccard: data.GraphicCard,
+          GraphicCard: data.GraphicCard,
           location: "Warehouse A",
           quantity: 1,
           status: "In Stock",
@@ -174,7 +174,7 @@ const LaptopTest = () => {
         os: data.OS,
         cpu: data.CPU,
         RAM: data.RAM,
-        storage: data.ssdHdd,
+        storage: data.SSDHdd,
         SSDHealth: data.SSDHealth,
         touch: data.touch,
         DisplaySize: data.DisplaySize,
@@ -287,7 +287,7 @@ window.location.href = "/login"; */}
             <option>64 GB</option>
             <option>128 GB</option>
           </select>
-          <select {...register("ssdHdd", { required: true })} className="w-full border p-2 rounded">
+          <select {...register("SSDHdd", { required: true })} className="w-full border p-2 rounded">
             <option value="">Select Storage</option>
             <option>128GB SSD</option>
             <option>256GB SSD</option>
