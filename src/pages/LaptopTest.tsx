@@ -118,7 +118,7 @@ const LaptopTest = () => {
       const { data: existing, error: dupError } = await supabase
         .from("laptop_tests")
         .select("id")
-        .eq("serialNo", data.SerialNo);
+        .eq("SerialNo", data.SerialNo);
 
       if (dupError) throw dupError;
       if (existing && existing.length > 0) {
@@ -145,7 +145,7 @@ const LaptopTest = () => {
       const { data: invExists } = await supabase
         .from("inventory")
         .select("id")
-        .eq("serialNo", data.SerialNo);
+        .eq("SerialNo", data.SerialNo);
 
       
        
