@@ -117,12 +117,12 @@ useEffect(() => {
   // ✅ Filtering logic using the search state
   const lowerSearch = search.toLowerCase();
   const filteredReports = reports.filter((item) =>
-    item.mashincode?.toString().toLowerCase().includes(lowerSearch) ||
-    item.serialNo?.toLowerCase().includes(lowerSearch) ||
+    item.MashinCode?.toString().toLowerCase().includes(lowerSearch) ||
+    item.SerialNo?.toLowerCase().includes(lowerSearch) ||
     item.tested_by?.toLowerCase().includes(lowerSearch) ||
-    item.model?.toLowerCase().includes(lowerSearch) ||
-    item.gen?.toLowerCase().includes(lowerSearch) ||
-    item.graphiccard?.toLowerCase().includes(lowerSearch)
+    item.Model?.toLowerCase().includes(lowerSearch) ||
+    item.Gen?.toLowerCase().includes(lowerSearch) ||
+    item.GraphicCard?.toLowerCase().includes(lowerSearch)
   );
 
   // ✅ Toggle selection for checkboxes
@@ -178,10 +178,10 @@ useEffect(() => {
     const qrData = encodeURIComponent(
       JSON.stringify({
         company: "Furtherance Technotree Pvt Ltd, Indore",
-        serialNo: test.serialNo,
-        model: test.model,
-        cpu: test.cpu,
-        ram: test.ram,
+        SerialNo: test.SerialNo,
+        Model: test.Model,
+        CPU: test.CPU,
+        RAM: test.RAM,
         SSDHdd: test.SSDHdd,
         testedBy: testerName,
         testedDate: new Date(testedOn).toLocaleDateString(),
@@ -238,9 +238,9 @@ useEffect(() => {
       const qrData = encodeURIComponent(
         JSON.stringify({
           company: " ",
-          mashincode: test.mashincode,
-          serialNo: test.serialNo,
-          model: test.model,
+          MashinCode: test.MashinCode,
+          SerialNo: test.SerialNo,
+          Model: test.model,
           testedBy: getTesterName(test.tested_by),
           testedDate: new Date(test.created_at).toLocaleDateString(),
         })
@@ -272,8 +272,8 @@ useEffect(() => {
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.text(`Machine Code: ${test.mashincode}`, centerX, textStartY + 2.5, { align: "center" });
-      doc.text(`S/N: ${test.serialNo}`, centerX, textStartY + 5.8, { align: "center" });
+      doc.text(`Machine Code: ${test.MashinCode}`, centerX, textStartY + 2.5, { align: "center" });
+      doc.text(`S/N: ${test.SerialNo}`, centerX, textStartY + 5.8, { align: "center" });
 
 
       // Optional: Add model line (if not empty)
@@ -316,15 +316,15 @@ useEffect(() => {
       const transfer = transfers?.find((t) => t.laptop_id === r.id);
 
       return {
-        MachineCode: r.mashincode,
-        Model: r.model,
-        SerialNo: r.serialNo,
-        OS: r.os,
-        Gen: r.gen,
-        CPU: r.cpu,
-        RAM: r.ram,
+        MachineCode: r.MashinCode,
+        Model: r.Model,
+        SerialNo: r.SerialNo,
+        OS: r.OS,
+        Gen: r.Gen,
+        CPU: r.CPU,
+        RAM: r.RAM,
         Storage: r.SSDHdd,
-        SSDHealth: r.ssdHealth,
+        SSDHealth: r.SSDHealth,
         TestedBy: getTesterName(r.tested_by),
         TestedDate: new Date(r.created_at).toLocaleString(),
 
