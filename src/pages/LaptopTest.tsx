@@ -75,36 +75,40 @@ const LaptopTest = () => {
   // ✅ Get user from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // Fetch next machine code on mount
+
   // Fetch next machine code on mount
   useEffect(() => {
-    const fetchNextCode = async () => {
-      try {
-        const { data, error } = await supabase.rpc("get_next_machine_code");
+  const fetchNextCode = async () => {
+    const { data, error } = await supabase
+      .from("laptop_tests")
+      .select("MashinCode")
+      .order("MashinCode", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-        if (error) throw error;
+    if (error) {
+      console.error("Machine Code fetch error:", error.message);
+      setValue("MashinCode", 101);
+      setNextMachineCode(101);
+      return;
+    }
 
-        const nextCode = data || 101;
-        setNextMachineCode(nextCode);
-        setValue("MashinCode", nextCode);
-      } catch (err: any) {
-        console.error("Error fetching machine code:", err.message);
-        toast.error("Failed to fetch next machine code.");
-        setNextMachineCode(101);
-        setValue("MashinCode", 101);
-      }
-    };
+    const lastCode = Number(data?.MashinCode) || 100;
+    const nextCode = lastCode + 1;
 
-    fetchNextCode();
+    setNextMachineCode(nextCode);
+    setValue("MashinCode", nextCode);
+  };
 
-    // ✅ Set test date and tester (moved inside same effect)
-    const now = new Date();
-    setTestDate(now.toISOString().slice(0, 10));
+  fetchNextCode();
 
-    supabase.auth.getUser().then(({ data }) => {
-      setTestedBy(data?.user?.email || "");
-    });
-  }, [setValue]);
+  const now = new Date();
+  setTestDate(now.toISOString().slice(0, 10));
+
+  supabase.auth.getUser().then(({ data }) => {
+    setTestedBy(data?.user?.email || "");
+  });
+}, [setValue]);
 
 
   // ✅ Handle form submit + auto add to inventory
@@ -143,36 +147,16 @@ const LaptopTest = () => {
         .select("id")
         .eq("serialNo", data.SerialNo);
 
-      if (!invExists || invExists.length === 0) {
-        const inventoryData = {
-          MashinCode: data.MashinCode,
-          Model: data.Model,
-          SerialNo: data.SerialNo,
-          OS: data.OS,
-          CPU: data.CPU,
-          RAM: data.RAM,
-          storage: data.SSDHdd,
-          SSDHealth: data.SSDHealth,
-          touch: data.touch,
-          DisplaySize: data.DisplaySize,
-          ScreenResolutions: statusbar.ScreenResolutions,
-          GraphicCard: data.GraphicCard,
-          location: "Warehouse A",
-          quantity: 1,
-          status: "In Stock",
-        };
-        const { error: invError } = await supabase.from("inventory").insert([inventoryData]);
-        if (invError) throw invError;
-      }
-
+      
+       
 
       // 2️⃣ Auto-add to Inventory
       const inventoryData = {
-        mashincode: data.MashinCode,
-        model: data.Model,
-        serialNo: data.SerialNo,
-        os: data.OS,
-        cpu: data.CPU,
+        MashinCode: data.MashinCode,
+        Model: data.Model,
+        SerialNo: data.SerialNo,
+        OS: data.OS,
+        CPU: data.CPU,
         RAM: data.RAM,
         storage: data.SSDHdd,
         SSDHealth: data.SSDHealth,

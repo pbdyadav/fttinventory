@@ -240,7 +240,7 @@ useEffect(() => {
           company: " ",
           MashinCode: test.MashinCode,
           SerialNo: test.SerialNo,
-          Model: test.model,
+          Model: test.Model,
           testedBy: getTesterName(test.tested_by),
           testedDate: new Date(test.created_at).toLocaleDateString(),
         })
