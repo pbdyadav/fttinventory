@@ -6,20 +6,20 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
 type LaptopForm = {
-  mashincode: number;
-  model: string;
-  serialNo: string;
-  os: string;
-  gen: string;
-  cpu: string;
-  ram: string;
+  MashinCode: number;
+  Model: string;
+  SerialNo: string;
+  OS: string;
+  Gen: string;
+  CPU: string;
+  RAM: string;
   ssdHdd: string;
-  ssdHealth: string;
+  SSDHealth: string;
   touch: string;
-  displaysize: string;
-  typesofscreenresolutions: string;
-  graphiccard: string;
-  graphicmodel: string;
+  DisplaySize: string;
+  ScreenResolutions: string;
+  GraphicCard: string;
+  GraphicCardModel: string;
   AvailableDeadPixels: boolean;
   NoDeadPixels: boolean;
   ShowingLightShadowonScreen: boolean;
@@ -61,9 +61,9 @@ type LaptopForm = {
   DriverInstallation: boolean;
   SoftwareInstallation: boolean;
   DigitalLicenseCheck: boolean;
-  warranty: string;
+  WarrantyExp: string;
   photoshoot: boolean;
-  remarks: string;
+  EngineerRemarks: string;
 };
 
 export default function EditReport() {
@@ -130,10 +130,10 @@ window.location.href = "/login"; */}
         {/* 🔹 Basic Info */}
         <h3 className="text-lg font-semibold">Basic Information</h3>
         <div className="grid grid-cols-2 gap-4">
-          <input {...register("mashincode")} readOnly className="w-full border p-2 rounded bg-gray-100" />
-          <input {...register("model", { required: true })} className="w-full border p-2 rounded" placeholder="Model" />
-          <input {...register("serialNo", { required: true })} className="w-full border p-2 rounded" placeholder="Serial No." />
-          <select {...register("os")} className="w-full border p-2 rounded">
+          <input {...register("MashinCode")} readOnly className="w-full border p-2 rounded bg-gray-100" />
+          <input {...register("Model", { required: true })} className="w-full border p-2 rounded" placeholder="Model" />
+          <input {...register("SerialNo", { required: true })} className="w-full border p-2 rounded" placeholder="Serial No." />
+          <select {...register("OS")} className="w-full border p-2 rounded">
             <option value="">Select OS</option>
             <option>Win-10 Home</option>
             <option>Win-10 Pro</option>
@@ -142,7 +142,7 @@ window.location.href = "/login"; */}
             <option>Mac OS</option>
             <option>Ubuntu</option>
           </select>
-          <select {...register("cpu")} className="w-full border p-2 rounded">
+          <select {...register("CPU")} className="w-full border p-2 rounded">
             <option value="">Select CPU</option>
             <option>i3</option>
             <option>i5</option>
@@ -157,7 +157,7 @@ window.location.href = "/login"; */}
             <option>M-3 Air</option>
             <option>M-3 Pro</option>
           </select>
-          <select {...register("gen")} className="w-full border p-2 rounded">
+          <select {...register("Gen")} className="w-full border p-2 rounded">
             <option value="">Select Generation</option>
             <option>6th</option>
             <option>7th</option>
@@ -168,7 +168,7 @@ window.location.href = "/login"; */}
             <option>12th</option>
             <option>13th</option>
           </select>
-          <select {...register("ram")} className="w-full border p-2 rounded">
+          <select {...register("RAM")} className="w-full border p-2 rounded">
             <option value="">Select RAM</option>
             <option>8 GB</option>
             <option>10 GB</option>
@@ -195,13 +195,13 @@ window.location.href = "/login"; */}
             <option>256GB SSD + 500GB HDD</option>
             <option>256GB SSD + 1TB HDD</option>
           </select>
-          <input {...register("ssdHealth")} className="w-full border p-2 rounded" placeholder="SSD Health %" />
+          <input {...register("SSDHealth")} className="w-full border p-2 rounded" placeholder="SSD Health %" />
           <select {...register("touch")} className="w-full border p-2 rounded">
             <option value="">Touchscreen?</option>
             <option>Touch</option>
             <option>Non Touch</option>
           </select>
-         <select {...register("displaysize")} className="w-full border p-2 rounded">
+         <select {...register("DisplaySize")} className="w-full border p-2 rounded">
             <option value="">Display Size (inches)</option>
             <option>13"</option>
             <option>13.3"</option>
@@ -209,7 +209,7 @@ window.location.href = "/login"; */}
             <option>15"</option>
             <option>16"</option>
           </select>
-          <select {...register("typesofscreenresolutions")} className="w-full border p-2 rounded">
+          <select {...register("ScreenResolutions")} className="w-full border p-2 rounded">
             <option value="">Types of Screen Resolutions (SD/HD/HDR/FHD)</option>
             <option>SD"</option>
             <option>HD"</option>
@@ -217,14 +217,14 @@ window.location.href = "/login"; */}
             <option>FHD"</option>
             <option>4K"</option>
           </select>
-          <select {...register("graphiccard")} className="w-full border p-2 rounded">
+          <select {...register("GraphicCard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
             <option>2 GB</option>
             <option>4 GB</option>
             <option>8 GB</option>
             <option>Nil</option>
           </select>
-          <input {...register("graphicmodel")} placeholder="Graphic Model" className="w-full border p-2 rounded" />
+          <input {...register("GraphicCardModel")} placeholder="Graphic Card Model" className="w-full border p-2 rounded" />
         </div>
 
         {/* 🔹 Display Tests */}
@@ -304,10 +304,10 @@ window.location.href = "/login"; */}
 
 {/*warranty*/}
         <h3 className="text-lg font-semibold">Warranty Check</h3>
-        <textarea {...register("warranty")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
+        <textarea {...register("WarrantyExp")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
         {/* 🔹 Remarks */}
         <h3 className="text-lg font-semibold">Remarks</h3>
-        <textarea {...register("remarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
+        <textarea {...register("EngineerRemarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
 
         {Object.keys(errors).length > 0 && (
           <div className="text-red-600 text-sm">Please fill all required fields.</div>

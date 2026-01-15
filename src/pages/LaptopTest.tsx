@@ -3,21 +3,21 @@ import { useForm } from "react-hook-form";
 import { supabase } from "@/lib/supabaseClient";
 
 type LaptopForm = {
-  mashincode: number;
-  model: string;
-  serialNo: string;
-  os: string;
-  gen: string;
-  cpu: string;
-  ram: string;
+  MashinCode: number;
+  Model: string;
+  SerialNo: string;
+  OS: string;
+  Gen: string;
+  CPU: string;
+  RAM: string;
   ssdHdd: string;
-  ssdHealth: string;
+  SSDHealth: string;
   touch: string;
-  displaysize: string;
-  typesofscreenresolutions: string;
+  DisplaySize: string;
+  ScreenResolutions: string;
 
-  graphiccard: string;
-  graphicmodel: string;
+  GraphicCard: string;
+  GraphicCardModel: string;
   AvailableDeadPixels: boolean;
   NoDeadPixels: boolean;
   ShowingLightShadowonScreen: boolean;
@@ -61,8 +61,8 @@ type LaptopForm = {
   DriverInstallation: boolean;
   SoftwareInstallation: boolean;
   DigitalLicenseCheck: boolean;
-  warranty: string;
-  remarks: string;
+  WarrantyExp: string;
+  EngineerRemarks: string;
 };
 
 const LaptopTest = () => {
@@ -86,12 +86,12 @@ const LaptopTest = () => {
 
         const nextCode = data || 101;
         setNextMachineCode(nextCode);
-        setValue("mashincode", nextCode);
+        setValue("MashinCode", nextCode);
       } catch (err: any) {
         console.error("Error fetching machine code:", err.message);
         toast.error("Failed to fetch next machine code.");
         setNextMachineCode(101);
-        setValue("mashincode", 101);
+        setValue("MashinCode", 101);
       }
     };
 
@@ -114,7 +114,7 @@ const LaptopTest = () => {
       const { data: existing, error: dupError } = await supabase
         .from("laptop_tests")
         .select("id")
-        .eq("serialNo", data.serialNo);
+        .eq("serialNo", data.SerialNo);
 
       if (dupError) throw dupError;
       if (existing && existing.length > 0) {
@@ -141,22 +141,22 @@ const LaptopTest = () => {
       const { data: invExists } = await supabase
         .from("inventory")
         .select("id")
-        .eq("serialNo", data.serialNo);
+        .eq("serialNo", data.SerialNo);
 
       if (!invExists || invExists.length === 0) {
         const inventoryData = {
-          mashincode: data.mashincode,
-          model: data.model,
-          serialNo: data.serialNo,
-          os: data.os,
-          cpu: data.cpu,
-          ram: data.ram,
+          mashincode: data.MashinCode,
+          model: data.Model,
+          serialNo: data.SerialNo,
+          os: data.OS,
+          cpu: data.CPU,
+          RAM: data.RAM,
           storage: data.ssdHdd,
-          ssdHealth: data.ssdHealth,
+          SSDHealth: data.SSDHealth,
           touch: data.touch,
-          displaysize: data.displaysize,
-          typesofscreenresolutions: statusbar.typesofscreenresolutions,
-          graphiccard: data.graphiccard,
+          displaysize: data.DisplaySize,
+          ScreenResolutions: statusbar.ScreenResolutions,
+          graphiccard: data.GraphicCard,
           location: "Warehouse A",
           quantity: 1,
           status: "In Stock",
@@ -168,17 +168,17 @@ const LaptopTest = () => {
 
       // 2️⃣ Auto-add to Inventory
       const inventoryData = {
-        mashincode: data.mashincode,
-        model: data.model,
-        serialNo: data.serialNo,
-        os: data.os,
-        cpu: data.cpu,
-        ram: data.ram,
+        mashincode: data.MashinCode,
+        model: data.Model,
+        serialNo: data.SerialNo,
+        os: data.OS,
+        cpu: data.CPU,
+        RAM: data.RAM,
         storage: data.ssdHdd,
-        ssdHealth: data.ssdHealth,
+        SSDHealth: data.SSDHealth,
         touch: data.touch,
-        displaysize: data.displaysize,
-        graphiccard: data.graphiccard,
+        DisplaySize: data.DisplaySize,
+        GraphicCard: data.GraphicCard,
         location: "Warehouse A",
         quantity: 1,
         status: "In Stock",
@@ -192,7 +192,7 @@ const LaptopTest = () => {
       const qr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${payload}`;
       setQrUrl(qr);
 
-      alert(`✅ Laptop test saved and added to inventory! Machine Code: ${data.mashincode}`);
+      alert(`✅ Laptop test saved and added to inventory! Machine Code: ${data.MashinCode}`);
 
       {/*await supabase.auth.signOut();
 localStorage.removeItem("user");
@@ -210,7 +210,7 @@ window.location.href = "/login"; */}
       const newCode = (nextMachineCode ?? 100) + 1;
       setNextMachineCode(newCode);
       reset();
-      setValue("mashincode", newCode);
+      setValue("MashinCode", newCode);
     } catch (err: any) {
       alert("❌ Error saving test: " + err.message);
     }
@@ -232,14 +232,14 @@ window.location.href = "/login"; */}
         <h3 className="text-lg font-semibold">Basic Information</h3>
         <div className="grid grid-cols-2 gap-4">
           <input
-            {...register("mashincode", { required: true })}
+            {...register("MashinCode", { required: true })}
             readOnly
             className="w-full border p-2 rounded bg-gray-100 text-gray-700"
             placeholder="Machine Code"
           />
-          <input {...register("model", { required: true })} placeholder="Model" className="w-full border p-2 rounded" />
-          <input {...register("serialNo", { required: true })} placeholder="Serial No." className="w-full border p-2 rounded" />
-          <select {...register("os", { required: true })} className="w-full border p-2 rounded">
+          <input {...register("Model", { required: true })} placeholder="Model" className="w-full border p-2 rounded" />
+          <input {...register("SerialNo", { required: true })} placeholder="Serial No." className="w-full border p-2 rounded" />
+          <select {...register("OS", { required: true })} className="w-full border p-2 rounded">
             <option value="">Select OS</option>
             <option>Win-10 Home</option>
             <option>Win-10 Pro</option>
@@ -248,7 +248,7 @@ window.location.href = "/login"; */}
             <option>Mac OS</option>
             <option>Ubuntu</option>
           </select>
-          <select {...register("cpu")} className="w-full border p-2 rounded">
+          <select {...register("CPU")} className="w-full border p-2 rounded">
             <option value="">Select CPU</option>
             <option>i3</option>
             <option>i5</option>
@@ -263,7 +263,7 @@ window.location.href = "/login"; */}
             <option>M-3 Air</option>
             <option>M-3 Pro</option>
           </select>
-          <select {...register("gen")} className="w-full border p-2 rounded">
+          <select {...register("Gen")} className="w-full border p-2 rounded">
             <option value="">Select Generation</option>
             <option>6th</option>
             <option>7th</option>
@@ -274,7 +274,7 @@ window.location.href = "/login"; */}
             <option>12th</option>
             <option>13th</option>
           </select>
-          <select {...register("ram", { required: true })} className="w-full border p-2 rounded">
+          <select {...register("RAM", { required: true })} className="w-full border p-2 rounded">
             <option value="">Select RAM</option>
             <option>8 GB</option>
             <option>10 GB</option>
@@ -301,13 +301,13 @@ window.location.href = "/login"; */}
             <option>256GB SSD + 500GB HDD</option>
             <option>256GB SSD + 1TB HDD</option>
           </select>
-          <input {...register("ssdHealth")} placeholder="SSD Health %" className="w-full border p-2 rounded" />
+          <input {...register("SSDHealth")} placeholder="SSD Health %" className="w-full border p-2 rounded" />
           <select {...register("touch")} className="w-full border p-2 rounded">
             <option value="">Touchscreen?</option>
             <option>Touch</option>
             <option>Non Touch</option>
           </select>
-          <select {...register("displaysize")} className="w-full border p-2 rounded">
+          <select {...register("DisplaySize")} className="w-full border p-2 rounded">
             <option value="">Display Size (inches)</option>
             <option>13"</option>
             <option>13.3"</option>
@@ -315,7 +315,7 @@ window.location.href = "/login"; */}
             <option>15"</option>
             <option>16"</option>
           </select>
-          <select {...register("typesofscreenresolutions")} className="w-full border p-2 rounded">
+          <select {...register("ScreenResolutions")} className="w-full border p-2 rounded">
             <option value="">Types of Screen Resolutions (SD/HD/HDR/FHD)</option>
             <option>SD"</option>
             <option>HD"</option>
@@ -323,7 +323,7 @@ window.location.href = "/login"; */}
             <option>FHD"</option>
             <option>4K"</option>
           </select>
-          <select {...register("graphiccard")} className="w-full border p-2 rounded">
+          <select {...register("GraphicCard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
             <option>1 GB</option>
             <option>2 GB</option>
@@ -333,7 +333,7 @@ window.location.href = "/login"; */}
             <option>8 GB</option>
             <option>Nil</option>
           </select>
-          <input {...register("graphicmodel")} placeholder="Graphic Card Model" className="w-full border p-2 rounded" />
+          <input {...register("GraphicCardModel")} placeholder="Graphic Card Model" className="w-full border p-2 rounded" />
         </div>
 
         {/* 🔹 Display Tests */}
@@ -408,11 +408,11 @@ window.location.href = "/login"; */}
         </div>
         {/*warranty*/}
         <h3 className="text-lg font-semibold">Warranty Check</h3>
-        <textarea {...register("warranty")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
+        <textarea {...register("WarrantyExp")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
 
         {/* 🔹 Remarks */}
         <h3 className="text-lg font-semibold">Remarks</h3>
-        <textarea {...register("remarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
+        <textarea {...register("EngineerRemarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
 
         {Object.keys(errors).length > 0 && (
           <div className="text-red-600 text-sm">Please fill all required fields.</div>
