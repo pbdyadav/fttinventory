@@ -9,12 +9,12 @@ import CompanyLogo from "@/assets/logo.png";
 
 type Item = {
   laptop_id?: number | null;
-  machine_code?: string;
-  serial_no?: string;
-  model?: string;
-  cpu?: string;
-  generation?: string;
-  ram?: string;
+  Machine_Code?: string;
+  Serial_No?: string;
+  Model?: string;
+  CPU?: string;
+  Generation?: string;
+  RAM?: string;
   storage?: string;
   price?: number | string;
 };
@@ -87,7 +87,7 @@ export default function CreateInvoice() {
       if (id) {
         const { data, error } = await supabase
           .from("laptop_tests")
-          .select("id,mashincode,serialNo,model,cpu,gen,ram,ssdHdd,status")
+          .select("id,MashinCode,SerialNo,Model,CPU,Gen,RAM,SSDHdd,status")
           .eq("id", Number(id))
           .single();
 
@@ -96,12 +96,12 @@ export default function CreateInvoice() {
           setItems([
             {
               price: "",
-              machine_code: "",
-              serial_no: "",
-              model: "",
-              cpu: "",
-              generation: "",
-              ram: "",
+              Machine_Code: "",
+              Serial_No: "",
+              Model: "",
+              CPU: "",
+              Generation: "",
+              RAM: "",
               storage: "",
               laptop_id: null,
             },
@@ -110,13 +110,13 @@ export default function CreateInvoice() {
           setItems([
             {
               laptop_id: data.id,
-              machine_code: data.mashincode?.toString() ?? "",
-              serial_no: data.serialNo ?? "",
-              model: data.model ?? "",
-              cpu: data.cpu ?? "",
-              generation: data.gen ?? "",
-              ram: data.ram ?? "",
-              storage: data.ssdHdd ?? "",
+              Machine_code: data.MashinCode?.toString() ?? "",
+              Serial_no: data.SerialNo ?? "",
+              Model: data.Model ?? "",
+              CPU: data.CPU ?? "",
+              Generation: data.Gen ?? "",
+              RAM: data.RAM ?? "",
+              storage: data.SSDHdd ?? "",
               price: "",
             },
           ]);
@@ -125,12 +125,12 @@ export default function CreateInvoice() {
         setItems([
           {
             price: "",
-            machine_code: "",
-            serial_no: "",
-            model: "",
-            cpu: "",
-            generation: "",
-            ram: "",
+            Machine_Code: "",
+            Serial_No: "",
+            Model: "",
+            CPU: "",
+            Generation: "",
+            RAM: "",
             storage: "",
             laptop_id: null,
           },
@@ -162,12 +162,12 @@ export default function CreateInvoice() {
       ...s,
       {
         laptop_id: null,
-        machine_code: "",
-        serial_no: "",
-        model: "",
-        cpu: "",
-        generation: "",
-        ram: "",
+        Machine_Code: "",
+        Serial_No: "",
+        Model: "",
+        CPU: "",
+        Generation: "",
+        RAM: "",
         storage: "",
         price: "",
       },
@@ -240,12 +240,12 @@ export default function CreateInvoice() {
     // Items table
     const rows = itemsList.map((it, i) => [
       (i + 1).toString(),
-      it.machine_code || "-",
-      it.serial_no || "-",
-      it.model || "-",
-      it.cpu || "-",
-      it.generation || "-",
-      it.ram || "-",
+      it.Machine_Code || "-",
+      it.Serial_No || "-",
+      it.Model || "-",
+      it.CPU || "-",
+      it.Generation || "-",
+      it.RAM || "-",
       it.storage || "-",
       `₹ ${Number(it.price || 0).toFixed(2)}`,
     ]);
@@ -523,17 +523,17 @@ return doc.output("blob");
           {items.map((it, idx) => (
             <div key={idx} className="p-3 border rounded mb-2 grid grid-cols-2 gap-2">
               <div>
-                <input placeholder="Machine Code" className="border p-2 w-full mb-2" value={it.machine_code || ""} onChange={(e) => updateItem(idx, "machine_code", e.target.value)} />
-                <input placeholder="Serial No" className="border p-2 w-full mb-2" value={it.serial_no || ""} onChange={(e) => updateItem(idx, "serial_no", e.target.value)} />
-                <input placeholder="Model" className="border p-2 w-full mb-2" value={it.model || ""} onChange={(e) => updateItem(idx, "model", e.target.value)} />
+                <input placeholder="Machine Code" className="border p-2 w-full mb-2" value={it.machine_code || ""} onChange={(e) => updateItem(idx, "Machine_Code", e.target.value)} />
+                <input placeholder="Serial No" className="border p-2 w-full mb-2" value={it.serial_no || ""} onChange={(e) => updateItem(idx, "Serial_No", e.target.value)} />
+                <input placeholder="Model" className="border p-2 w-full mb-2" value={it.model || ""} onChange={(e) => updateItem(idx, "Model", e.target.value)} />
                 <div className="flex gap-2">
-                  <input placeholder="CPU" className="border p-2 w-full" value={it.cpu || ""} onChange={(e) => updateItem(idx, "cpu", e.target.value)} />
-                  <input placeholder="Generation" className="border p-2 w-full" value={it.generation || ""} onChange={(e) => updateItem(idx, "generation", e.target.value)} />
+                  <input placeholder="CPU" className="border p-2 w-full" value={it.cpu || ""} onChange={(e) => updateItem(idx, "CPU", e.target.value)} />
+                  <input placeholder="Generation" className="border p-2 w-full" value={it.generation || ""} onChange={(e) => updateItem(idx, "Generation", e.target.value)} />
                 </div>
               </div>
 
               <div>
-                <input placeholder="RAM" className="border p-2 w-full mb-2" value={it.ram || ""} onChange={(e) => updateItem(idx, "ram", e.target.value)} />
+                <input placeholder="RAM" className="border p-2 w-full mb-2" value={it.ram || ""} onChange={(e) => updateItem(idx, "RAM", e.target.value)} />
                 <input placeholder="Storage" className="border p-2 w-full mb-2" value={it.storage || ""} onChange={(e) => updateItem(idx, "storage", e.target.value)} />
                 <input placeholder="Price (₹)" type="number" className="border p-2 w-full mb-2" value={String(it.price || "")} onChange={(e) => updateItem(idx, "price", e.target.value)} />
                 {items.length > 1 && <button type="button" className="text-red-600" onClick={() => removeItem(idx)}>Remove</button>}
