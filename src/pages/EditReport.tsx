@@ -26,7 +26,7 @@ type LaptopForm = {
   DisplayBroken: boolean;
   ScreenPatches: boolean;
   KeyboardMarks: boolean;
-  HingesOk: boolean;
+  HingesOK: boolean;
   HingesHard: boolean;
   HingesLoose: boolean;
   batteryhealth: string;
@@ -48,19 +48,19 @@ type LaptopForm = {
   USBWrite: boolean;
   PowerChargingPort: boolean;
   TypeCPort: boolean;
-  Apanel: string;
-  Bpanel: string;
-  Cpanel: string;
-  Dpanel: string;
-  brightness: boolean;
-  volume: boolean;
-  bt: boolean;
-  fpl: boolean;
-  bl: boolean;
-  sr: boolean;
-  driveri: boolean;
-  softi: boolean;
-  dl: boolean;
+  APanel: string;
+  BPanel: string;
+  CPanel: string;
+  DPanel: string;
+  Brightness: boolean;
+  Volume: boolean;
+  Bluetooth: boolean;
+  FingerprintLock: boolean;
+  BackLight: boolean;
+  ScreenRotate: boolean;
+  DriverInstallation: boolean;
+  SoftwareInstallation: boolean;
+  DigitalLicenseCheck: boolean;
   warranty: string;
   photoshoot: boolean;
   remarks: string;
@@ -236,7 +236,7 @@ window.location.href = "/login"; */}
   <label><input type="checkbox" {...register("DisplayBroken")} className="mr-2" /> Display Broken</label>
   <label><input type="checkbox" {...register("ScreenPatches")} className="mr-2" /> Screen Patches</label>
   <label><input type="checkbox" {...register("KeyboardMarks")} className="mr-2" /> Keyboard Marks</label>
-  <label><input type="checkbox" {...register("HingesOk")} className="mr-2" /> Hinges OK</label>
+  <label><input type="checkbox" {...register("HingesOK")} className="mr-2" /> Hinges OK</label>
   <label><input type="checkbox" {...register("HingesHard")} className="mr-2" /> Hinges Hard</label>
   <label><input type="checkbox" {...register("HingesLoose")} className="mr-2" /> Hinges Loose</label>
 </div>
@@ -277,25 +277,25 @@ window.location.href = "/login"; */}
 {/* 🔹 Panels */}
 <h3 className="text-lg font-semibold mt-6 mb-2">Panels</h3>
 <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
-  <input {...register("Apanel")} placeholder="A Panel" className="border p-2 rounded w-full" />
-  <input {...register("Bpanel")} placeholder="B Panel" className="border p-2 rounded w-full" />
-  <input {...register("Cpanel")} placeholder="C Panel" className="border p-2 rounded w-full" />
-  <input {...register("Dpanel")} placeholder="D Panel" className="border p-2 rounded w-full" />
+  <input {...register("APanel")} placeholder="A Panel" className="border p-2 rounded w-full" />
+  <input {...register("BPanel")} placeholder="B Panel" className="border p-2 rounded w-full" />
+  <input {...register("CPanel")} placeholder="C Panel" className="border p-2 rounded w-full" />
+  <input {...register("DPanel")} placeholder="D Panel" className="border p-2 rounded w-full" />
 </div>
 
 {/* 🔹 Function Keys & Features */}
 <h3 className="text-lg font-semibold mt-6 mb-2">Function Keys & Features</h3>
 <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
   {[
-    { key: "brightness", label: "Brightness + / -" },
-    { key: "volume", label: "Volume + / -" },
+    { key: "Brightness", label: "Brightness + / -" },
+    { key: "Volume", label: "Volume + / -" },
     { key: "Bluetooth", label: "Bluetooth" },
-    { key: "fpl", label: "Fingerprint Lock" },
-    { key: "bl", label: "Backlight" },
-    { key: "sr", label: "Screen Rotate" },
-    { key: "driveri", label: "Driver Installation" },
-    { key: "softi", label: "Software Installation" },
-    { key: "dl", label: "Digital License Check" },
+    { key: "FingerprintLock", label: "Fingerprint Lock" },
+    { key: "BackLight", label: "Backlight" },
+    { key: "ScreenRotate", label: "Screen Rotate" },
+    { key: "DriverInstallation", label: "Driver Installation" },
+    { key: "SoftwareInstallation", label: "Software Installation" },
+    { key: "DigitalLicenseCheck", label: "Digital License Check" },
     { key: "Photo Shoot Done", label: "Photo Shoot Done" },
   ].map(({ key, label }) => (
     <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>

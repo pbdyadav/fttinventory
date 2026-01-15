@@ -48,19 +48,19 @@ type LaptopForm = {
   USBWrite: boolean;
   PowerChargingPort: boolean;
   TypeCPort: boolean;
-  Apanel: string;
-  Bpanel: string;
-  Cpanel: string;
-  Dpanel: string;
-  brightness: boolean;
-  volume: boolean;
+  APanel: string;
+  BPanel: string;
+  CPanel: string;
+  DPanel: string;
+  Brightness: boolean;
+  Volume: boolean;
   Bluetooth: boolean;
-  fpl: boolean;
-  bl: boolean;
-  sr: boolean;
-  driveri: boolean;
-  softi: boolean;
-  dl: boolean;
+  FingerprintLock: boolean;
+  BackLight: boolean;
+  ScreenRotate: boolean;
+  DriverInstallation: boolean;
+  SoftwareInstallation: boolean;
+  DigitalLicenseCheck: boolean;
   warranty: string;
   remarks: string;
 };
@@ -383,24 +383,24 @@ window.location.href = "/login"; */}
 
         {/* 🔹 Panels */}
         <h3 className="text-lg font-semibold">Panels</h3>
-        <input {...register("Apanel")} placeholder="A Panel" className="w-full border p-2 rounded" />
-        <input {...register("Bpanel")} placeholder="B Panel" className="w-full border p-2 rounded" />
-        <input {...register("Cpanel")} placeholder="C Panel" className="w-full border p-2 rounded" />
-        <input {...register("Dpanel")} placeholder="D Panel" className="w-full border p-2 rounded" />
+        <input {...register("APanel")} placeholder="A Panel" className="w-full border p-2 rounded" />
+        <input {...register("BPanel")} placeholder="B Panel" className="w-full border p-2 rounded" />
+        <input {...register("CPanel")} placeholder="C Panel" className="w-full border p-2 rounded" />
+        <input {...register("DPanel")} placeholder="D Panel" className="w-full border p-2 rounded" />
 
         {/* 🔹 Function Keys & Features */}
         <h3 className="text-lg font-semibold">Function Keys & Features</h3>
         <div className="grid grid-cols-3 gap-2">
           {[
-            { key: "brightness", label: "Brightness + / -" },
-            { key: "volume", label: "Volume + / -" },
+            { key: "Brightness", label: "Brightness + / -" },
+            { key: "Volume", label: "Volume + / -" },
             { key: "Bluetooth", label: "Bluetooth" },
-            { key: "fpl", label: "Fingerprint Lock" },
-            { key: "bl", label: "Backlight" },
-            { key: "sr", label: "Screen Rotate" },
-            { key: "driveri", label: "Driver Installation" },
-            { key: "softi", label: "Software Installation" },
-            { key: "dl", label: "Digital License Check" },
+            { key: "FingerprintLock", label: "Fingerprint Lock" },
+            { key: "BackLight", label: "Backlight" },
+            { key: "ScreenRotate", label: "Screen Rotate" },
+            { key: "DriverInstallation", label: "Driver Installation" },
+            { key: "SoftwareInstallation", label: "Software Installation" },
+            { key: "DigitalLicenseCheck", label: "Digital License Check" },
 
           ].map(({ key, label }) => (
             <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} /> {label}</label>
