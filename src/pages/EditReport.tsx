@@ -26,28 +26,28 @@ type LaptopForm = {
   DisplayBroken: boolean;
   ScreenPatches: boolean;
   KeyboardMarks: boolean;
-  HingesOK: boolean;
+  HingesOk: boolean;
   HingesHard: boolean;
   HingesLoose: boolean;
   batteryhealth: string;
   batteryreading: string;
-  hdmiport: boolean;
-  lanport: boolean;
-  wifi: boolean;
-  camera: boolean;
-  mic: boolean;
-  keyboard: boolean;
-  keypaint: boolean;
-  touchpad: boolean;
-  rclick: boolean;
-  lclick: boolean;
-  rspeaker: boolean;
-  lspeaker: boolean;
-  ajack: boolean;
-  usbpr: boolean;
-  usbpw: boolean;
-  pcp: boolean;
-  Cport: boolean;
+  HDMIPort: boolean;
+  LanPort: boolean;
+  WiFi: boolean;
+  Camera: boolean;
+  Microphone: boolean;
+  Keyboard: boolean;
+  KeyPaint: boolean;
+  TouchPad: boolean;
+  RightClick: boolean;
+  LeftClick: boolean;
+  RightSpeaker: boolean;
+  LeftSpeaker: boolean;
+  AudioJack: boolean;
+  USBRead: boolean;
+  USBWrite: boolean;
+  PowerChargingPort: boolean;
+  TypeCPort: boolean;
   Apanel: string;
   Bpanel: string;
   Cpanel: string;
@@ -236,7 +236,7 @@ window.location.href = "/login"; */}
   <label><input type="checkbox" {...register("DisplayBroken")} className="mr-2" /> Display Broken</label>
   <label><input type="checkbox" {...register("ScreenPatches")} className="mr-2" /> Screen Patches</label>
   <label><input type="checkbox" {...register("KeyboardMarks")} className="mr-2" /> Keyboard Marks</label>
-  <label><input type="checkbox" {...register("HingesOK")} className="mr-2" /> Hinges OK</label>
+  <label><input type="checkbox" {...register("HingesOk")} className="mr-2" /> Hinges OK</label>
   <label><input type="checkbox" {...register("HingesHard")} className="mr-2" /> Hinges Hard</label>
   <label><input type="checkbox" {...register("HingesLoose")} className="mr-2" /> Hinges Loose</label>
 </div>
@@ -252,23 +252,23 @@ window.location.href = "/login"; */}
 <h3 className="text-lg font-semibold mt-6 mb-2">Ports & Connectivity</h3>
 <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
   {[
-    { key: "hdmiport", label: "HDMI Port" },
-    { key: "lanport", label: "LAN Port" },
-    { key: "wifi", label: "Wi-Fi" },
-    { key: "camera", label: "Camera" },
-    { key: "mic", label: "Microphone" },
-    { key: "keyboard", label: "Keyboard" },
-    { key: "keypaint", label: "Key Paint" },
-    { key: "touchpad", label: "Touchpad" },
-    { key: "rclick", label: "Right Click" },
-    { key: "lclick", label: "Left Click" },
-    { key: "rspeaker", label: "Right Speaker" },
-    { key: "lspeaker", label: "Left Speaker" },
-    { key: "ajack", label: "Audio Jack" },
-    { key: "usbpr", label: "USB Read" },
-    { key: "usbpw", label: "USB Write" },
-    { key: "pcp", label: "Power Charging Port" },
-    { key: "Cport", label: "Type-C Port" },
+    { key: "HDMIPort", label: "HDMI Port" },
+    { key: "LanPort", label: "LAN Port" },
+    { key: "WiFi", label: "Wi-Fi" },
+    { key: "Camera", label: "Camera" },
+    { key: "Microphone", label: "Microphone" },
+    { key: "Keyboard", label: "Keyboard" },
+    { key: "KeyPaint", label: "Key Paint" },
+    { key: "TouchPad", label: "Touchpad" },
+    { key: "RightClick", label: "Right Click" },
+    { key: "LeftClick", label: "Left Click" },
+    { key: "RightSpeaker", label: "Right Speaker" },
+    { key: "LeftSpeaker", label: "Left Speaker" },
+    { key: "AudioJack", label: "Audio Jack" },
+    { key: "USBRead", label: "USB Read" },
+    { key: "USBWrite", label: "USB Write" },
+    { key: "PowerChargingPort", label: "Power Charging Port" },
+    { key: "TypeCPort", label: "Type-C Port" },
   ].map(({ key, label }) => (
     <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>
   ))}
