@@ -306,8 +306,8 @@ window.location.href = "/login"; */}
         <h3 className="text-lg font-semibold">Warranty Check</h3>
         <textarea {...register("WarrantyExp")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
         {/* 🔹 Remarks */}
-        <h3 className="text-lg font-semibold">Remarks</h3>
-        <textarea {...register("EngineerRemarks")} placeholder="Engineer Remark" className="w-full border p-2 rounded" />
+        <h3 className="text-lg font-semibold">Engineer Remarks</h3>
+        <textarea {...register("EngineerRemarks")} placeholder="Engineer Remarks" className="w-full border p-2 rounded" />
 
         {Object.keys(errors).length > 0 && (
           <div className="text-red-600 text-sm">Please fill all required fields.</div>

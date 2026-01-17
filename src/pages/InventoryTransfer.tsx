@@ -15,7 +15,7 @@ export default function InventoryTransfer() {
     person_name: "",
     contact_info: "",
     address: "",
-    remarks: "",
+    EngineerRemarks: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,7 +71,7 @@ export default function InventoryTransfer() {
           person_name: form.person_name,
           contact_info: form.contact_info,
           address: form.address,
-          remarks: form.remarks,
+          EngineerRemarks: form.EngineerRemarks,
           transfer_date: new Date().toISOString(), // ✅ auto date
         },
       ]);
@@ -99,13 +99,13 @@ export default function InventoryTransfer() {
         {laptop && (
           <div className="bg-gray-100 p-4 mb-4 rounded">
             <p>
-              <strong>Machine Code:</strong> {laptop.mashincode || "-"}
+              <strong>Machine Code:</strong> {laptop.MashinCode || "-"}
             </p>
             <p>
-              <strong>Model:</strong> {laptop.model || "-"}
+              <strong>Model:</strong> {laptop.Model || "-"}
             </p>
             <p>
-              <strong>Serial No:</strong> {laptop.serialNo || "-"}
+              <strong>Serial No:</strong> {laptop.SerialNo || "-"}
             </p>
           </div>
         )}
@@ -157,13 +157,13 @@ export default function InventoryTransfer() {
 
           {/* Remarks */}
           <div>
-            <label className="block text-sm font-medium mb-1">Remarks</label>
+            <label className="block text-sm font-medium mb-1">EngineerRemarks</label>
             <textarea
               className="w-full border p-2 rounded"
               rows={2}
-              value={form.remarks}
+              value={form.EngineerRemarks}
               onChange={(e) =>
-                setForm({ ...form, remarks: e.target.value })
+                setForm({ ...form, EngineerRemarks: e.target.value })
               }
             />
           </div>
