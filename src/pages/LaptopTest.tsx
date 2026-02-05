@@ -158,7 +158,7 @@ const LaptopTest = () => {
         OS: data.OS,
         CPU: data.CPU,
         RAM: data.RAM,
-        storage: data.SSDHdd,
+        Storage: data.SSDHdd,
         SSDHealth: data.SSDHealth,
         touch: data.touch,
         DisplaySize: data.DisplaySize,
