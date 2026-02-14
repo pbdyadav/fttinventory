@@ -306,6 +306,7 @@ window.location.href = "/login"; */}
             <option>HDR"</option>
             <option>FHD"</option>
             <option>4K"</option>
+            <option>Liquid Retina XDR"</option>
           </select>
           <select {...register("GraphicCard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>

@@ -100,15 +100,15 @@ export default function EditReport() {
       if (error) throw error;
       toast.success("✅ Report updated successfully! Logging out for security...");
 
-     {/*} await supabase.auth.signOut();
+      {/*} await supabase.auth.signOut();
 localStorage.removeItem("user");
 window.location.href = "/login"; */}
 
 
       setTimeout(async () => {
-      await supabase.auth.signOut();
-      localStorage.clear();
-      window.location.href = "/login";
+        await supabase.auth.signOut();
+        localStorage.clear();
+        window.location.href = "/login";
       }, 2000);
 
 
@@ -201,7 +201,7 @@ window.location.href = "/login"; */}
             <option>Touch</option>
             <option>Non Touch</option>
           </select>
-         <select {...register("DisplaySize")} className="w-full border p-2 rounded">
+          <select {...register("DisplaySize")} className="w-full border p-2 rounded">
             <option value="">Display Size (inches)</option>
             <option>13"</option>
             <option>13.3"</option>
@@ -216,11 +216,15 @@ window.location.href = "/login"; */}
             <option>HDR"</option>
             <option>FHD"</option>
             <option>4K"</option>
+            <option>Liquid Retina XDR</option>
           </select>
           <select {...register("GraphicCard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
+            <option>1 GB</option>
             <option>2 GB</option>
+            <option>3 GB</option>
             <option>4 GB</option>
+            <option>6 GB</option>
             <option>8 GB</option>
             <option>Nil</option>
           </select>
@@ -228,81 +232,81 @@ window.location.href = "/login"; */}
         </div>
 
         {/* 🔹 Display Tests */}
-<h3 className="text-lg font-semibold mt-6 mb-2">Display Tests</h3>
-<div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
-  <label><input type="checkbox" {...register("AvailableDeadPixels")} className="mr-2" /> Available Dead Pixels</label>
-  <label><input type="checkbox" {...register("NoDeadPixels")} className="mr-2" /> No Dead Pixels</label>
-  <label><input type="checkbox" {...register("ShowingLightShadowonScreen")} className="mr-2" /> Showing Light Shadow on Screen</label>
-  <label><input type="checkbox" {...register("DisplayBroken")} className="mr-2" /> Display Broken</label>
-  <label><input type="checkbox" {...register("ScreenPatches")} className="mr-2" /> Screen Patches</label>
-  <label><input type="checkbox" {...register("KeyboardMarks")} className="mr-2" /> Keyboard Marks</label>
-  <label><input type="checkbox" {...register("HingesOK")} className="mr-2" /> Hinges OK</label>
-  <label><input type="checkbox" {...register("HingesHard")} className="mr-2" /> Hinges Hard</label>
-  <label><input type="checkbox" {...register("HingesLoose")} className="mr-2" /> Hinges Loose</label>
-</div>
+        <h3 className="text-lg font-semibold mt-6 mb-2">Display Tests</h3>
+        <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
+          <label><input type="checkbox" {...register("AvailableDeadPixels")} className="mr-2" /> Available Dead Pixels</label>
+          <label><input type="checkbox" {...register("NoDeadPixels")} className="mr-2" /> No Dead Pixels</label>
+          <label><input type="checkbox" {...register("ShowingLightShadowonScreen")} className="mr-2" /> Showing Light Shadow on Screen</label>
+          <label><input type="checkbox" {...register("DisplayBroken")} className="mr-2" /> Display Broken</label>
+          <label><input type="checkbox" {...register("ScreenPatches")} className="mr-2" /> Screen Patches</label>
+          <label><input type="checkbox" {...register("KeyboardMarks")} className="mr-2" /> Keyboard Marks</label>
+          <label><input type="checkbox" {...register("HingesOK")} className="mr-2" /> Hinges OK</label>
+          <label><input type="checkbox" {...register("HingesHard")} className="mr-2" /> Hinges Hard</label>
+          <label><input type="checkbox" {...register("HingesLoose")} className="mr-2" /> Hinges Loose</label>
+        </div>
 
-{/* 🔹 Battery */}
-<h3 className="text-lg font-semibold mt-6 mb-2">Battery</h3>
-<div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
-  <input {...register("batteryhealth")} placeholder="Battery Health %" className="border p-2 rounded w-full" />
-  <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="border p-2 rounded w-full" />
-</div>
+        {/* 🔹 Battery */}
+        <h3 className="text-lg font-semibold mt-6 mb-2">Battery</h3>
+        <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
+          <input {...register("batteryhealth")} placeholder="Battery Health %" className="border p-2 rounded w-full" />
+          <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="border p-2 rounded w-full" />
+        </div>
 
-{/* 🔹 Ports & Connectivity */}
-<h3 className="text-lg font-semibold mt-6 mb-2">Ports & Connectivity</h3>
-<div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
-  {[
-    { key: "HDMIPort", label: "HDMI Port" },
-    { key: "LanPort", label: "LAN Port" },
-    { key: "WiFi", label: "Wi-Fi" },
-    { key: "Camera", label: "Camera" },
-    { key: "Microphone", label: "Microphone" },
-    { key: "Keyboard", label: "Keyboard" },
-    { key: "KeyPaint", label: "Key Paint" },
-    { key: "TouchPad", label: "Touchpad" },
-    { key: "RightClick", label: "Right Click" },
-    { key: "LeftClick", label: "Left Click" },
-    { key: "RightSpeaker", label: "Right Speaker" },
-    { key: "LeftSpeaker", label: "Left Speaker" },
-    { key: "AudioJack", label: "Audio Jack" },
-    { key: "USBRead", label: "USB Read" },
-    { key: "USBWrite", label: "USB Write" },
-    { key: "PowerChargingPort", label: "Power Charging Port" },
-    { key: "TypeCPort", label: "Type-C Port" },
-  ].map(({ key, label }) => (
-    <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>
-  ))}
-</div>
+        {/* 🔹 Ports & Connectivity */}
+        <h3 className="text-lg font-semibold mt-6 mb-2">Ports & Connectivity</h3>
+        <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
+          {[
+            { key: "HDMIPort", label: "HDMI Port" },
+            { key: "LanPort", label: "LAN Port" },
+            { key: "WiFi", label: "Wi-Fi" },
+            { key: "Camera", label: "Camera" },
+            { key: "Microphone", label: "Microphone" },
+            { key: "Keyboard", label: "Keyboard" },
+            { key: "KeyPaint", label: "Key Paint" },
+            { key: "TouchPad", label: "Touchpad" },
+            { key: "RightClick", label: "Right Click" },
+            { key: "LeftClick", label: "Left Click" },
+            { key: "RightSpeaker", label: "Right Speaker" },
+            { key: "LeftSpeaker", label: "Left Speaker" },
+            { key: "AudioJack", label: "Audio Jack" },
+            { key: "USBRead", label: "USB Read" },
+            { key: "USBWrite", label: "USB Write" },
+            { key: "PowerChargingPort", label: "Power Charging Port" },
+            { key: "TypeCPort", label: "Type-C Port" },
+          ].map(({ key, label }) => (
+            <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>
+          ))}
+        </div>
 
-{/* 🔹 Panels */}
-<h3 className="text-lg font-semibold mt-6 mb-2">Panels</h3>
-<div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
-  <input {...register("APanel")} placeholder="A Panel" className="border p-2 rounded w-full" />
-  <input {...register("BPanel")} placeholder="B Panel" className="border p-2 rounded w-full" />
-  <input {...register("CPanel")} placeholder="C Panel" className="border p-2 rounded w-full" />
-  <input {...register("DPanel")} placeholder="D Panel" className="border p-2 rounded w-full" />
-</div>
+        {/* 🔹 Panels */}
+        <h3 className="text-lg font-semibold mt-6 mb-2">Panels</h3>
+        <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
+          <input {...register("APanel")} placeholder="A Panel" className="border p-2 rounded w-full" />
+          <input {...register("BPanel")} placeholder="B Panel" className="border p-2 rounded w-full" />
+          <input {...register("CPanel")} placeholder="C Panel" className="border p-2 rounded w-full" />
+          <input {...register("DPanel")} placeholder="D Panel" className="border p-2 rounded w-full" />
+        </div>
 
-{/* 🔹 Function Keys & Features */}
-<h3 className="text-lg font-semibold mt-6 mb-2">Function Keys & Features</h3>
-<div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
-  {[
-    { key: "Brightness", label: "Brightness + / -" },
-    { key: "Volume", label: "Volume + / -" },
-    { key: "Bluetooth", label: "Bluetooth" },
-    { key: "FingerprintLock", label: "Fingerprint Lock" },
-    { key: "BackLight", label: "Backlight" },
-    { key: "ScreenRotate", label: "Screen Rotate" },
-    { key: "DriverInstallation", label: "Driver Installation" },
-    { key: "SoftwareInstallation", label: "Software Installation" },
-    { key: "DigitalLicenseCheck", label: "Digital License Check" },
-    { key: "Photo Shoot Done", label: "Photo Shoot Done" },
-  ].map(({ key, label }) => (
-    <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>
-  ))}
-</div>
+        {/* 🔹 Function Keys & Features */}
+        <h3 className="text-lg font-semibold mt-6 mb-2">Function Keys & Features</h3>
+        <div className="grid grid-cols-3 gap-3 p-3 border rounded-lg bg-gray-50">
+          {[
+            { key: "Brightness", label: "Brightness + / -" },
+            { key: "Volume", label: "Volume + / -" },
+            { key: "Bluetooth", label: "Bluetooth" },
+            { key: "FingerprintLock", label: "Fingerprint Lock" },
+            { key: "BackLight", label: "Backlight" },
+            { key: "ScreenRotate", label: "Screen Rotate" },
+            { key: "DriverInstallation", label: "Driver Installation" },
+            { key: "SoftwareInstallation", label: "Software Installation" },
+            { key: "DigitalLicenseCheck", label: "Digital License Check" },
+            { key: "Photo Shoot Done", label: "Photo Shoot Done" },
+          ].map(({ key, label }) => (
+            <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} className="mr-2" /> {label}</label>
+          ))}
+        </div>
 
-{/*warranty*/}
+        {/*warranty*/}
         <h3 className="text-lg font-semibold">Warranty Check</h3>
         <textarea {...register("WarrantyExp")} placeholder="Warranty Exp." className="w-full border p-2 rounded" />
         {/* 🔹 Remarks */}
