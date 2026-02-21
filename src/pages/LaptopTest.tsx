@@ -350,24 +350,15 @@ window.location.href = "/login"; */}
 
         <div className="grid grid-cols-3 gap-4">
           <input
-            type="number"
-            {...register("battery_1hr")}
-            placeholder="After 1 Hour (%)"
-            className="w-full border p-2 rounded"
+            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 1 Hour (%)" className="w-full border p-2 rounded"
           />
 
           <input
-            type="number"
-            {...register("battery_2hr")}
-            placeholder="After 2 Hours (%)"
-            className="w-full border p-2 rounded"
+            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 2 Hour (%)" className="w-full border p-2 rounded"
           />
 
           <input
-            type="number"
-            {...register("battery_3hr")}
-            placeholder="After 3 Hours (%)"
-            className="w-full border p-2 rounded"
+            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 3 Hour (%)" className="w-full border p-2 rounded"
           />
         </div>
 
