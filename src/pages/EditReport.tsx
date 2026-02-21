@@ -31,6 +31,9 @@ type LaptopForm = {
   HingesLoose: boolean;
   batteryhealth: string;
   batteryreading: string;
+  battery_1hr: number;
+  battery_2hr: number;
+  battery_3hr: number;
   HDMIPort: boolean;
   LanPort: boolean;
   WiFi: boolean;
@@ -250,6 +253,32 @@ window.location.href = "/login"; */}
         <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
           <input {...register("batteryhealth")} placeholder="Battery Health %" className="border p-2 rounded w-full" />
           <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="border p-2 rounded w-full" />
+        </div>
+
+        {/* 🔹 Battery Discharge Test */}
+        <h4 className="text-md font-semibold mt-4">Battery Discharge Test (After 100%) Restart after one hour.</h4>
+
+        <div className="grid grid-cols-3 gap-4">
+          <input
+            type="number"
+            {...register("battery_1hr")}
+            placeholder="After 1 Hour (%)"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            type="number"
+            {...register("battery_2hr")}
+            placeholder="After 2 Hours (%)"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            type="number"
+            {...register("battery_3hr")}
+            placeholder="After 3 Hours (%)"
+            className="w-full border p-2 rounded"
+          />
         </div>
 
         {/* 🔹 Ports & Connectivity */}

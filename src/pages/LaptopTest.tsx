@@ -31,6 +31,11 @@ type LaptopForm = {
 
   batteryhealth: string;
   batteryreading: string;
+
+  battery_1hr: number;
+  battery_2hr: number;
+  battery_3hr: number;
+
   HDMIPort: boolean;
   LanPort: boolean;
   WiFi: boolean;
@@ -78,37 +83,37 @@ const LaptopTest = () => {
 
   // Fetch next machine code on mount
   useEffect(() => {
-  const fetchNextCode = async () => {
-    const { data, error } = await supabase
-      .from("laptop_tests")
-      .select("MashinCode")
-      .order("MashinCode", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const fetchNextCode = async () => {
+      const { data, error } = await supabase
+        .from("laptop_tests")
+        .select("MashinCode")
+        .order("MashinCode", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) {
-      console.error("Machine Code fetch error:", error.message);
-      setValue("MashinCode", 101);
-      setNextMachineCode(101);
-      return;
-    }
+      if (error) {
+        console.error("Machine Code fetch error:", error.message);
+        setValue("MashinCode", 101);
+        setNextMachineCode(101);
+        return;
+      }
 
-    const lastCode = Number(data?.MashinCode) || 100;
-    const nextCode = lastCode + 1;
+      const lastCode = Number(data?.MashinCode) || 100;
+      const nextCode = lastCode + 1;
 
-    setNextMachineCode(nextCode);
-    setValue("MashinCode", nextCode);
-  };
+      setNextMachineCode(nextCode);
+      setValue("MashinCode", nextCode);
+    };
 
-  fetchNextCode();
+    fetchNextCode();
 
-  const now = new Date();
-  setTestDate(now.toISOString().slice(0, 10));
+    const now = new Date();
+    setTestDate(now.toISOString().slice(0, 10));
 
-  supabase.auth.getUser().then(({ data }) => {
-    setTestedBy(data?.user?.email || "");
-  });
-}, [setValue]);
+    supabase.auth.getUser().then(({ data }) => {
+      setTestedBy(data?.user?.email || "");
+    });
+  }, [setValue]);
 
 
   // ✅ Handle form submit + auto add to inventory
@@ -147,8 +152,8 @@ const LaptopTest = () => {
         .select("id")
         .eq("SerialNo", data.SerialNo);
 
-      
-       
+
+
 
       // 2️⃣ Auto-add to Inventory
       const inventoryData = {
@@ -339,6 +344,32 @@ window.location.href = "/login"; */}
         <h3 className="text-lg font-semibold">Battery</h3>
         <input {...register("batteryhealth")} placeholder="Battery Health %" className="w-full border p-2 rounded" />
         <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="w-full border p-2 rounded" />
+
+        {/* 🔹 Battery Discharge Test */}
+        <h4 className="text-md font-semibold mt-4">Battery Discharge Test (After 100%) Restart after one hour.</h4>
+
+        <div className="grid grid-cols-3 gap-4">
+          <input
+            type="number"
+            {...register("battery_1hr")}
+            placeholder="After 1 Hour (%)"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            type="number"
+            {...register("battery_2hr")}
+            placeholder="After 2 Hours (%)"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            type="number"
+            {...register("battery_3hr")}
+            placeholder="After 3 Hours (%)"
+            className="w-full border p-2 rounded"
+          />
+        </div>
 
         {/* 🔹 Ports & Connectivity */}
         <h3 className="text-lg font-semibold">Ports & Connectivity</h3>
