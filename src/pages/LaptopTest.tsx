@@ -346,19 +346,30 @@ window.location.href = "/login"; */}
         <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="w-full border p-2 rounded" />
 
         {/* 🔹 Battery Discharge Test */}
-        <h4 className="text-md font-semibold mt-4">Battery Discharge Test (After 100%) Restart after one hour.</h4>
+        <h4 className="text-md font-semibold mt-4">
+          Battery Discharge Test (After 100%) Restart after one hour.
+        </h4>
 
         <div className="grid grid-cols-3 gap-4">
           <input
-            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 1 Hour (%)" className="w-full border p-2 rounded"
+            type="number"
+            {...register("battery_1hr", { valueAsNumber: true })}
+            placeholder="After 1 Hour (%)"
+            className="w-full border p-2 rounded"
           />
 
           <input
-            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 2 Hour (%)" className="w-full border p-2 rounded"
+            type="number"
+            {...register("battery_2hr", { valueAsNumber: true })}
+            placeholder="After 2 Hour (%)"
+            className="w-full border p-2 rounded"
           />
 
           <input
-            type="number"{...register("battery_1hr", { valueAsNumber: true })} placeholder="After 3 Hour (%)" className="w-full border p-2 rounded"
+            type="number"
+            {...register("battery_3hr", { valueAsNumber: true })}
+            placeholder="After 3 Hour (%)"
+            className="w-full border p-2 rounded"
           />
         </div>
 
