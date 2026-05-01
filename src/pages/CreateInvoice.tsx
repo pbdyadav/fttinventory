@@ -35,6 +35,13 @@ type LocationState = {
   currentLocation?: string;
 };
 
+type PaymentMode =
+  | "cash"
+  | "online"
+  | "partial"
+  | "finance_card"
+  | "on_credit";
+
 const STORAGE_BUCKET = "invoices";
 
 const COMPANY = {
@@ -122,10 +129,22 @@ const getDisplayDescription = (item: InvoiceItem) =>
     ? item.description || "Gift Item"
     : getLaptopDescription(item) || item.model || "Laptop";
 
-const getPaymentLabel = (mode: "cash" | "online" | "partial") => {
+const getInvoiceItemDetails = (item: InvoiceItem) => {
+  if (item.itemType === "gift") {
+    return item.isComplimentary
+      ? `Gift\n${getDisplayDescription(item)}`
+      : getDisplayDescription(item);
+  }
+
+  return `Laptop\n${item.model || "-"}\nM/C: ${item.machineCode || "-"}\nS/N: ${item.serialNo || "-"}`;
+};
+
+const getPaymentLabel = (mode: PaymentMode) => {
   if (mode === "cash") return "Cash";
   if (mode === "online") return "Online";
-  return "Partial";
+  if (mode === "partial") return "Partial";
+  if (mode === "finance_card") return "Bajaj Finance / Credit Card";
+  return "On Credit";
 };
 
 const normalizePositiveNumber = (value: string | number) => {
@@ -174,10 +193,11 @@ const getCompatibleTransferType = (sourceLocation: string) => {
 };
 
 export default function CreateInvoice() {
-  const { id } = useParams();
+  const { id, saleId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state || {}) as LocationState;
+  const isEditMode = Boolean(saleId);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -192,11 +212,11 @@ export default function CreateInvoice() {
     gst: "",
   });
   const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [paymentMode, setPaymentMode] = useState<"cash" | "online" | "partial">(
-    "cash"
-  );
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const [cashAmount, setCashAmount] = useState(0);
   const [onlineAmount, setOnlineAmount] = useState(0);
+  const [financeDpAmount, setFinanceDpAmount] = useState(0);
+  const [installmentCount, setInstallmentCount] = useState(0);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + getLineTotal(item), 0),
@@ -214,6 +234,12 @@ export default function CreateInvoice() {
 
     if (paymentMode === "online") {
       setOnlineAmount(total);
+      setCashAmount(0);
+      return;
+    }
+
+    if (paymentMode === "finance_card") {
+      setOnlineAmount(0);
       setCashAmount(0);
     }
   }, [paymentMode, total]);
@@ -235,10 +261,141 @@ export default function CreateInvoice() {
     }
   };
 
+  const loadLaptopByMachineCode = async (
+    itemId: string,
+    machineCode: string,
+    allowSold = false
+  ) => {
+    const trimmedCode = machineCode.trim();
+    if (!trimmedCode) return;
+
+    const { data, error } = await supabase
+      .from("laptop_tests")
+      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, status")
+      .eq("MashinCode", Number(trimmedCode))
+      .maybeSingle();
+
+    if (error) {
+      toast.error("Unable to fetch laptop by machine code.");
+      return;
+    }
+
+    if (!data) {
+      toast.error("No laptop found for this machine code.");
+      return;
+    }
+
+    if (!allowSold && data.status === "sold") {
+      toast.error("This laptop is already marked as sold.");
+      return;
+    }
+
+    let sourceLocation = "Main Warehouse";
+    const { data: latestTransfer } = await supabase
+      .from("transfers")
+      .select("to_location")
+      .eq("laptop_id", data.id)
+      .order("transfer_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    sourceLocation = latestTransfer?.to_location || "Main Warehouse";
+
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              laptopId: data.id,
+              machineCode: String(data.MashinCode ?? ""),
+              serialNo: data.SerialNo ?? "",
+              model: data.Model ?? "",
+              cpu: data.CPU ?? "",
+              generation: data.Gen ?? "",
+              ram: data.RAM ?? "",
+              storage: data.SSDHdd ?? "",
+              sourceLocation,
+            }
+          : item
+      )
+    );
+  };
+
   useEffect(() => {
     const loadInvoiceContext = async () => {
       setLoading(true);
       setInvoiceNoPreview(await generateInvoiceNo());
+
+      if (saleId) {
+        const { data: saleData, error: saleError } = await supabase
+          .from("sales")
+          .select("*")
+          .eq("id", Number(saleId))
+          .single();
+
+        if (saleError || !saleData) {
+          toast.error("Failed to load sale invoice.");
+          setLoading(false);
+          return;
+        }
+
+        const { data: saleItemsData } = await supabase
+          .from("sales_items")
+          .select("*")
+          .or(`sale_id.eq.${saleId},invoice_id.eq.${saleId}`)
+          .order("id", { ascending: true });
+
+        setInvoiceNoPreview(saleData.invoice_no || "");
+        setInvoiceDate(saleData.invoice_date || new Date().toISOString().slice(0, 10));
+        setCustomer({
+          name: saleData.customer_name || "",
+          mobile: saleData.customer_mobile || "",
+          address: saleData.customer_address || "",
+          gst: saleData.customer_gst || "",
+        });
+
+        const editPaymentMode = (saleData.payment_mode || "cash") as PaymentMode;
+        setPaymentMode(editPaymentMode);
+        setCashAmount(Number(saleData.cash_amount || 0));
+        setOnlineAmount(Number(saleData.online_amount || 0));
+        setFinanceDpAmount(Number(saleData.finance_dp_amount || 0));
+        setInstallmentCount(Number(saleData.installment_count || 0));
+
+        const hydratedItems =
+          (saleItemsData || []).map((item: any) => ({
+            id: createId(),
+            itemType:
+              item.item_type === "gift" ||
+              String(item.model || "").startsWith("GIFT:")
+                ? "gift"
+                : "laptop",
+            laptopId: item.laptop_id ?? null,
+            machineCode: item.machine_code || "",
+            serialNo: item.serial_no || "",
+            model:
+              item.item_type === "gift"
+                ? ""
+                : item.model || "",
+            cpu: item.cpu || "",
+            generation: item.generation || "",
+            ram: item.ram || "",
+            storage: item.storage || "",
+            description:
+              item.description ||
+              String(item.model || "").replace(/^GIFT:\s*/, "") ||
+              "",
+            quantity: Number(item.quantity || 1),
+            unitPrice: Number(item.unit_price ?? item.price ?? item.amount ?? 0),
+            isComplimentary: Boolean(
+              item.is_complimentary ?? item.is_compliment ?? false
+            ),
+            sourceLocation: "Main Warehouse",
+          })) || [];
+
+        setItems(hydratedItems.length ? hydratedItems : [createEmptyLaptopItem()]);
+        setLoading(false);
+        return;
+      }
 
       if (!id) {
         setItems([createEmptyLaptopItem()]);
@@ -296,7 +453,7 @@ export default function CreateInvoice() {
     };
 
     loadInvoiceContext();
-  }, [id, locationState.currentLocation]);
+  }, [id, saleId, locationState.currentLocation]);
 
   const updateItem = (
     itemId: string,
@@ -419,9 +576,7 @@ export default function CreateInvoice() {
 
     const rows = itemsList.map((item, index) => [
       String(index + 1),
-      item.itemType === "gift"
-        ? `Gift\n${getDisplayDescription(item)}`
-        : `Laptop\n${item.model || "-"}\nM/C: ${item.machineCode || "-"}\nS/N: ${item.serialNo || "-"}`,
+      getInvoiceItemDetails(item),
       String(item.quantity || 1),
       formatCurrency(item.itemType === "gift" && item.isComplimentary ? 0 : item.unitPrice || 0),
       formatCurrency(getLineTotal(item)),
@@ -723,40 +878,83 @@ export default function CreateInvoice() {
       return;
     }
 
+    if (paymentMode === "finance_card") {
+      if (financeDpAmount <= 0) {
+        toast.error("DP amount required hai.");
+        return;
+      }
+      if (financeDpAmount > total) {
+        toast.error("DP amount total se zyada nahi ho sakta.");
+        return;
+      }
+      if (installmentCount <= 0) {
+        toast.error("Installment count required hai.");
+        return;
+      }
+    }
+
     setSaving(true);
-    const invoiceNo = await generateInvoiceNo();
+    const invoiceNo = isEditMode ? invoiceNoPreview : await generateInvoiceNo();
     setInvoiceNoPreview(invoiceNo);
 
     try {
-      const { data: saleRow, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          invoice_no: invoiceNo,
-          invoice_date: invoiceDate,
-          customer_name: customer.name,
-          customer_mobile: customer.mobile,
-          customer_address: customer.address,
-          customer_gst: customer.gst || null,
-          total_amount: total,
-          payment_mode: paymentMode,
-          cash_amount:
-            paymentMode === "cash"
-              ? total
-              : paymentMode === "partial"
-                ? Number(cashAmount || 0)
-                : 0,
-          online_amount:
-            paymentMode === "online"
-              ? total
-              : paymentMode === "partial"
-                ? Number(onlineAmount || 0)
-                : 0,
-        })
-        .select()
-        .single();
+      const salePayload = {
+        invoice_no: invoiceNo,
+        invoice_date: invoiceDate,
+        customer_name: customer.name,
+        customer_mobile: customer.mobile,
+        customer_address: customer.address,
+        customer_gst: customer.gst || null,
+        total_amount: total,
+        payment_mode: paymentMode,
+        cash_amount:
+          paymentMode === "cash"
+            ? total
+            : paymentMode === "partial"
+              ? Number(cashAmount || 0)
+              : 0,
+        online_amount:
+          paymentMode === "online"
+            ? total
+            : paymentMode === "partial"
+              ? Number(onlineAmount || 0)
+              : 0,
+        finance_dp_amount: paymentMode === "finance_card" ? Number(financeDpAmount || 0) : 0,
+        installment_count: paymentMode === "finance_card" ? Number(installmentCount || 0) : 0,
+      };
+
+      const saleMutation = isEditMode
+        ? supabase.from("sales").update(salePayload).eq("id", Number(saleId)).select().single()
+        : supabase.from("sales").insert(salePayload).select().single();
+
+      const { data: saleRow, error: saleError } = await saleMutation;
 
       if (saleError || !saleRow) {
         throw new Error(saleError?.message || "Sale record create nahi hua.");
+      }
+
+      if (isEditMode) {
+        const { data: previousItems } = await supabase
+          .from("sales_items")
+          .select("laptop_id")
+          .or(`sale_id.eq.${saleId},invoice_id.eq.${saleId}`);
+
+        const previousLaptopIds = (previousItems || [])
+          .map((entry: any) => entry.laptop_id)
+          .filter((value: number | null): value is number => Boolean(value));
+
+        if (previousLaptopIds.length) {
+          await supabase
+            .from("laptop_tests")
+            .update({ status: "In Stock" })
+            .in("id", previousLaptopIds);
+        }
+
+        await supabase.from("transfers").delete().eq("sale_invoice_id", saleRow.id);
+        await supabase
+          .from("sales_items")
+          .delete()
+          .or(`sale_id.eq.${saleRow.id},invoice_id.eq.${saleRow.id}`);
       }
 
       const fallbackLaptopId = getFallbackLaptopId(items);
@@ -854,7 +1052,11 @@ export default function CreateInvoice() {
         );
       }
 
-      toast.success("Sale invoice successfully save ho gayi.");
+      toast.success(
+        isEditMode
+          ? "Sale invoice updated successfully."
+          : "Sale invoice successfully save ho gayi."
+      );
       navigate("/sales");
     } catch (error: any) {
       console.error("saveInvoice error:", error);
@@ -879,14 +1081,16 @@ export default function CreateInvoice() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Create Sale Invoice</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {isEditMode ? "Edit Sale Invoice" : "Create Sale Invoice"}
+          </h1>
           <p className="text-sm text-gray-500">
             As soon as the sale is saved, the laptop will be marked as 'Sold' in the inventory and added to the sales list.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => navigate("/laptop-inventory")}
+          onClick={() => navigate(isEditMode ? "/sales" : "/laptop-inventory")}
           className="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50"
         >
           Back to Inventory
@@ -924,14 +1128,14 @@ export default function CreateInvoice() {
             </label>
             <select
               value={paymentMode}
-              onChange={(event) =>
-                setPaymentMode(event.target.value as "cash" | "online" | "partial")
-              }
+              onChange={(event) => setPaymentMode(event.target.value as PaymentMode)}
               className="border p-2.5 w-full rounded-lg"
             >
               <option value="cash">Cash</option>
               <option value="online">Online</option>
               <option value="partial">Partial (Cash + Online)</option>
+              <option value="finance_card">Bajaj Finance / Credit Card</option>
+              <option value="on_credit">On Credit</option>
             </select>
           </div>
         </div>
@@ -1014,6 +1218,37 @@ export default function CreateInvoice() {
                   </p>
                 </div>
               )}
+
+              {paymentMode === "finance_card" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="DP Amount"
+                    value={String(financeDpAmount || "")}
+                    onChange={(event) =>
+                      setFinanceDpAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Installments"
+                    value={String(installmentCount || "")}
+                    onChange={(event) =>
+                      setInstallmentCount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                </div>
+              )}
+
+              {paymentMode === "on_credit" && (
+                <p className="text-xs text-amber-700 pt-2">
+                  This invoice can be edited later from the Sales page when payment is received.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1054,12 +1289,16 @@ export default function CreateInvoice() {
                   <div className="text-sm font-semibold text-gray-900">
                     Item {index + 1}{" "}
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-white border border-gray-200 ml-2">
-                      {item.itemType === "gift" ? "Gift Item" : "Laptop"}
+                      {item.itemType === "gift"
+                        ? item.isComplimentary
+                          ? "Gift Item"
+                          : "Additional Item"
+                        : "Laptop"}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">
                     {item.itemType === "gift"
-                      ? "Gift line invoice aur report dono me capture hogi."
+                      ? "This item line will be captured in both the invoice and reports."
                       : "After the laptop sale, the inventory status will change to Sold."}
                   </p>
                 </div>
@@ -1125,6 +1364,13 @@ export default function CreateInvoice() {
                     value={item.machineCode}
                     onChange={(event) =>
                       updateItem(item.id, "machineCode", event.target.value)
+                    }
+                    onBlur={(event) =>
+                      loadLaptopByMachineCode(
+                        item.id,
+                        event.target.value,
+                        isEditMode
+                      )
                     }
                   />
                   <input
@@ -1199,7 +1445,7 @@ export default function CreateInvoice() {
           <button
             type="button"
             className="border border-gray-300 px-5 py-2.5 rounded-lg hover:bg-gray-50"
-            onClick={() => navigate("/laptop-inventory")}
+            onClick={() => navigate(isEditMode ? "/sales" : "/laptop-inventory")}
             disabled={saving}
           >
             Cancel
@@ -1210,7 +1456,7 @@ export default function CreateInvoice() {
             onClick={() => saveInvoice(false)}
             disabled={saving}
           >
-            {saving ? "Saving..." : "Save Invoice"}
+            {saving ? "Saving..." : isEditMode ? "Update Invoice" : "Save Invoice"}
           </button>
           <button
             type="button"

@@ -38,7 +38,9 @@ create table if not exists public.sales_items (
 
 alter table public.sales
   add column if not exists invoice_pdf_url text,
-  add column if not exists invoice_file_path text;
+  add column if not exists invoice_file_path text,
+  add column if not exists finance_dp_amount numeric(12,2) default 0,
+  add column if not exists installment_count integer default 0;
 
 alter table public.sales_items
   add column if not exists item_type text default 'laptop',

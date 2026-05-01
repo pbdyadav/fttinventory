@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
@@ -16,6 +17,8 @@ type SaleRow = {
   online_amount: number;
   invoice_pdf_url?: string | null;
   invoice_file_path?: string | null;
+  finance_dp_amount?: number | null;
+  installment_count?: number | null;
 };
 
 type SaleItemRow = {
@@ -57,6 +60,7 @@ const isGiftItem = (item: SaleItemRow) =>
   item.item_type === "gift" || item.model?.startsWith("GIFT:");
 
 export default function Sales() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [busySaleId, setBusySaleId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -340,6 +344,11 @@ export default function Sales() {
                 </td>
                 <td className="p-3 whitespace-nowrap">
                   <div>{sale.payment_mode || "-"}</div>
+                  {sale.payment_mode === "finance_card" && (
+                    <div className="text-xs text-gray-500">
+                      DP: {formatCurrency(Number(sale.finance_dp_amount || 0))} | EMI: {Number(sale.installment_count || 0)}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500">
                     Cash: {formatCurrency(Number(sale.cash_amount || 0))}
                   </div>
@@ -358,6 +367,13 @@ export default function Sales() {
                       className="text-blue-600 hover:underline"
                     >
                       Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/sales/edit/${sale.id}`)}
+                      className="text-amber-600 hover:underline"
+                    >
+                      Edit
                     </button>
                     <button
                       type="button"

@@ -174,6 +174,14 @@ export default function App() {
               </PrivateRoute>
             }
           />
+          <Route
+            path="/sales/edit/:saleId"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <CreateInvoice />
+              </PrivateRoute>
+            }
+          />
 
           {/* Default */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
