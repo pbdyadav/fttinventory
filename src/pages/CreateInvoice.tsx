@@ -1,63 +1,223 @@
-// src/pages/CreateInvoice.tsx
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import CompanyLogo from "@/assets/logo.png";
 
-type Item = {
-  laptop_id?: number | null;
-  Machine_Code?: string;
-  Serial_No?: string;
-  Model?: string;
-  CPU?: string;
-  Generation?: string;
-  RAM?: string;
-  storage?: string;
-  price?: number | string;
+type CustomerDetails = {
+  name: string;
+  mobile: string;
+  address: string;
+  gst: string;
+};
+
+type InvoiceItem = {
+  id: string;
+  itemType: "laptop" | "gift";
+  laptopId: number | null;
+  machineCode: string;
+  serialNo: string;
+  model: string;
+  cpu: string;
+  generation: string;
+  ram: string;
+  storage: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  isComplimentary: boolean;
+  sourceLocation: string;
+};
+
+type LocationState = {
+  currentLocation?: string;
+};
+
+const STORAGE_BUCKET = "invoices";
+
+const COMPANY = {
+  name: "FURTHERANCE TECHNOTREE PRIVATE LIMITED",
+  addressLine1: "402-C, Block, Silver Mall",
+  addressLine2: "8 A RNT MARG, INDORE - 452001",
+  gst: "GSTIN/UIN: 23AACCF9503E1Z1",
+  state: "Madhya Pradesh (23)",
+  phone: "Mob.: 9713036633",
+  email: "Email: fttpvtltd@gmail.com",
+};
+
+let cachedCompressedLogo: Promise<string | null> | null = null;
+
+const createId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createEmptyLaptopItem = (): InvoiceItem => ({
+  id: createId(),
+  itemType: "laptop",
+  laptopId: null,
+  machineCode: "",
+  serialNo: "",
+  model: "",
+  cpu: "",
+  generation: "",
+  ram: "",
+  storage: "",
+  description: "",
+  quantity: 1,
+  unitPrice: 0,
+  isComplimentary: false,
+  sourceLocation: "Main Warehouse",
+});
+
+const createGiftItem = (): InvoiceItem => ({
+  id: createId(),
+  itemType: "gift",
+  laptopId: null,
+  machineCode: "",
+  serialNo: "",
+  model: "",
+  cpu: "",
+  generation: "",
+  ram: "",
+  storage: "",
+  description: "",
+  quantity: 1,
+  unitPrice: 0,
+  isComplimentary: true,
+  sourceLocation: "",
+});
+
+const formatCurrency = (value: number) =>
+  `Rs. ${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+const getLineTotal = (item: InvoiceItem) =>
+  item.itemType === "gift" && item.isComplimentary
+    ? 0
+    : Number(item.quantity || 0) * Number(item.unitPrice || 0);
+
+const getLaptopDescription = (item: InvoiceItem) =>
+  [
+    item.model,
+    item.cpu,
+    item.generation ? `${item.generation} Gen` : "",
+    item.ram,
+    item.storage,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+const getDisplayDescription = (item: InvoiceItem) =>
+  item.itemType === "gift"
+    ? item.description || "Gift Item"
+    : getLaptopDescription(item) || item.model || "Laptop";
+
+const getPaymentLabel = (mode: "cash" | "online" | "partial") => {
+  if (mode === "cash") return "Cash";
+  if (mode === "online") return "Online";
+  return "Partial";
+};
+
+const normalizePositiveNumber = (value: string | number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+const loadCompressedLogo = async () => {
+  if (!cachedCompressedLogo) {
+    cachedCompressedLogo = new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => {
+        const maxWidth = 180;
+        const scale = Math.min(1, maxWidth / image.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          resolve(null);
+          return;
+        }
+
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.42));
+      };
+      image.onerror = () => resolve(null);
+      image.src = CompanyLogo;
+    });
+  }
+
+  return cachedCompressedLogo;
+};
+
+const getFallbackLaptopId = (items: InvoiceItem[]) =>
+  items.find((item) => item.itemType === "laptop" && item.laptopId)?.laptopId ?? null;
+
+const getCompatibleTransferType = (sourceLocation: string) => {
+  const normalized = sourceLocation.toLowerCase();
+  if (normalized.includes("retail")) return "retail";
+  if (normalized.includes("godown")) return "godown";
+  return "warehouse";
 };
 
 export default function CreateInvoice() {
-  const { id } = useParams(); // optional laptop id
+  const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = (location.state || {}) as LocationState;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [invoiceNoPreview, setInvoiceNoPreview] = useState("Generating...");
-  const [customer, setCustomer] = useState({
+  const [invoiceDate, setInvoiceDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [customer, setCustomer] = useState<CustomerDetails>({
     name: "",
     mobile: "",
     address: "",
     gst: "",
   });
-
-  const [items, setItems] = useState<Item[]>([]);
-  const [invoiceDate, setInvoiceDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
-
-  // Payment mode: 'cash' | 'online' | 'partial'
+  const [items, setItems] = useState<InvoiceItem[]>([]);
   const [paymentMode, setPaymentMode] = useState<"cash" | "online" | "partial">(
     "cash"
   );
-  const [cashAmount, setCashAmount] = useState<number>(0);
-  const [onlineAmount, setOnlineAmount] = useState<number>(0);
+  const [cashAmount, setCashAmount] = useState(0);
+  const [onlineAmount, setOnlineAmount] = useState(0);
 
-  const STORAGE_BUCKET = "invoices";
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + getLineTotal(item), 0),
+    [items]
+  );
 
-  const COMPANY = {
-    name: "FURTHERANCE TECHNOTREE PRIVATE LIMITED",
-    addressLine1: "402-C, Block, Silver Mall",
-    addressLine2: "8 A RNT MARG, INDORE - 452001",
-    gst: "GSTIN/UIN: 23AACCF9503E1Z1",
-    state: "Madhya Pradesh (23)",
-    phone: "",
-  };
+  const total = subtotal;
 
-  // generate invoice no: INV-00001 style (reads last sales id)
+  useEffect(() => {
+    if (paymentMode === "cash") {
+      setCashAmount(total);
+      setOnlineAmount(0);
+      return;
+    }
+
+    if (paymentMode === "online") {
+      setOnlineAmount(total);
+      setCashAmount(0);
+    }
+  }, [paymentMode, total]);
+
   const generateInvoiceNo = async (): Promise<string> => {
     try {
       const { data } = await supabase
@@ -68,302 +228,499 @@ export default function CreateInvoice() {
         .single();
 
       const lastId = data?.id ?? 0;
-      const next = Number(lastId) + 1;
-      const padded = String(next).padStart(5, "0");
-      return `INV-${padded}`;
-    } catch (err) {
-      console.warn("Invoice no generation failed:", err);
-      const ts = Date.now().toString().slice(-6);
-      return `INV-${ts}`;
+      return `INV-${String(Number(lastId) + 1).padStart(5, "0")}`;
+    } catch (error) {
+      console.warn("Invoice no generation fallback:", error);
+      return `INV-${Date.now().toString().slice(-6)}`;
     }
   };
 
   useEffect(() => {
-    const start = async () => {
+    const loadInvoiceContext = async () => {
       setLoading(true);
-      const inv = await generateInvoiceNo();
-      setInvoiceNoPreview(inv);
+      setInvoiceNoPreview(await generateInvoiceNo());
 
-      if (id) {
-        const { data, error } = await supabase
-          .from("laptop_tests")
-          .select("id,MashinCode,SerialNo,Model,CPU,Gen,RAM,SSDHdd,status")
-          .eq("id", Number(id))
-          .single();
-
-        if (error) {
-          toast.error("Failed to load laptop: " + error.message);
-          setItems([
-            {
-              price: "",
-              Machine_Code: "",
-              Serial_No: "",
-              Model: "",
-              CPU: "",
-              Generation: "",
-              RAM: "",
-              storage: "",
-              laptop_id: null,
-            },
-          ]);
-        } else if (data) {
-          setItems([
-            {
-              laptop_id: data.id,
-              Machine_code: data.MashinCode?.toString() ?? "",
-              Serial_no: data.SerialNo ?? "",
-              Model: data.Model ?? "",
-              CPU: data.CPU ?? "",
-              Generation: data.Gen ?? "",
-              RAM: data.RAM ?? "",
-              storage: data.SSDHdd ?? "",
-              price: "",
-            },
-          ]);
-        }
-      } else {
-        setItems([
-          {
-            price: "",
-            Machine_Code: "",
-            Serial_No: "",
-            Model: "",
-            CPU: "",
-            Generation: "",
-            RAM: "",
-            storage: "",
-            laptop_id: null,
-          },
-        ]);
+      if (!id) {
+        setItems([createEmptyLaptopItem()]);
+        setLoading(false);
+        return;
       }
 
+      const laptopId = Number(id);
+      const { data, error } = await supabase
+        .from("laptop_tests")
+        .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, status")
+        .eq("id", laptopId)
+        .single();
+
+      if (error || !data) {
+        toast.error("Failed to load laptop details.");
+        setItems([createEmptyLaptopItem()]);
+        setLoading(false);
+        return;
+      }
+
+      let sourceLocation = locationState.currentLocation || "Main Warehouse";
+      if (!locationState.currentLocation) {
+        const { data: latestTransfer } = await supabase
+          .from("transfers")
+          .select("to_location")
+          .eq("laptop_id", laptopId)
+          .order("transfer_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        sourceLocation = latestTransfer?.to_location || "Main Warehouse";
+      }
+
+      setItems([
+        {
+          id: createId(),
+          itemType: "laptop",
+          laptopId: data.id,
+          machineCode: String(data.MashinCode ?? ""),
+          serialNo: data.SerialNo ?? "",
+          model: data.Model ?? "",
+          cpu: data.CPU ?? "",
+          generation: data.Gen ?? "",
+          ram: data.RAM ?? "",
+          storage: data.SSDHdd ?? "",
+          description: "",
+          quantity: 1,
+          unitPrice: 0,
+          isComplimentary: false,
+          sourceLocation,
+        },
+      ]);
       setLoading(false);
     };
 
-    start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    loadInvoiceContext();
+  }, [id, locationState.currentLocation]);
 
   const updateItem = (
-    idx: number,
-    field: keyof Item,
-    value: string | number | null
+    itemId: string,
+    field: keyof InvoiceItem,
+    value: string | number | boolean | null
   ) => {
-    setItems((s) => {
-      const copy = [...s];
-      if (field === "price") copy[idx][field] = Number(value || 0);
-      else copy[idx][field] = value as any;
-      return copy;
-    });
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== itemId) return item;
+
+        const updated = {
+          ...item,
+          [field]:
+            field === "quantity" || field === "unitPrice"
+              ? normalizePositiveNumber(value as string | number)
+              : value,
+        } as InvoiceItem;
+
+        if (field === "isComplimentary" && Boolean(value)) {
+          updated.unitPrice = 0;
+        }
+
+        return updated;
+      })
+    );
   };
 
-  const addItem = () =>
-    setItems((s) => [
-      ...s,
-      {
-        laptop_id: null,
-        Machine_Code: "",
-        Serial_No: "",
-        Model: "",
-        CPU: "",
-        Generation: "",
-        RAM: "",
-        storage: "",
-        price: "",
-      },
-    ]);
+  const addLaptopItem = () =>
+    setItems((current) => [...current, createEmptyLaptopItem()]);
 
-  const removeItem = (idx: number) =>
-    setItems((s) => s.filter((_, i) => i !== idx));
+  const addGiftItem = () =>
+    setItems((current) => [...current, createGiftItem()]);
 
-  const subtotal = items.reduce((sum, it) => sum + Number(it.price || 0), 0);
-  const total = subtotal; // no GST scenario
+  const removeItem = (itemId: string) =>
+    setItems((current) => current.filter((item) => item.id !== itemId));
 
-  // PDF generator (classic boxed layout)
-  // --- PROFESSIONAL PDF GENERATOR ---
   const generatePdfBlob = async (
     invoiceNo: string,
-    saleRow: any,
-    itemsList: Item[],
-    customerData: any,
-    dateStr: string,
-    company: any
+    itemsList: InvoiceItem[],
+    customerData: CustomerDetails
   ): Promise<Blob> => {
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const doc = new jsPDF({
+      unit: "pt",
+      format: "a4",
+      compress: true,
+      putOnlyUsedFonts: true,
+    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const left = 36;
+    const right = pageWidth - 36;
+    const bottomMargin = 42;
+    let y = 34;
 
-    const PAGE_WIDTH = doc.internal.pageSize.getWidth();
-    const LEFT = 40;
-    let y = 40;
-
-    // Add company logo
     try {
-      doc.addImage(CompanyLogo, "PNG", LEFT, y, 65, 55);
-    } catch { }
+      const compressedLogo = await loadCompressedLogo();
+      if (compressedLogo) {
+        doc.addImage(compressedLogo, "JPEG", left, y + 2, 38, 38, undefined, "MEDIUM");
+      }
+    } catch {
+      console.warn("Unable to attach logo to invoice PDF.");
+    }
 
-    // Company details
+    const companyNameX = left + 58;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text(company.name, LEFT + 80, y + 15);
+    doc.setFontSize(9);
+    doc.text(COMPANY.name, companyNameX, y + 12);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(company.addressLine1, LEFT + 80, y + 32);
-    doc.text(company.addressLine2, LEFT + 80, y + 46);
-    doc.text(company.gst, LEFT + 80, y + 60);
-    doc.text(company.state, LEFT + 80, y + 74);
+    doc.setFontSize(8.5);
+    const companyInfoTop = y + 30;
+    doc.text(COMPANY.addressLine1, companyNameX, companyInfoTop);
+    doc.text(COMPANY.addressLine2, companyNameX, companyInfoTop + 12);
+    doc.text(COMPANY.gst, companyNameX, companyInfoTop + 24);
+    doc.text(`${COMPANY.state}   ${COMPANY.phone}`, companyNameX, companyInfoTop + 36);
+    doc.text(COMPANY.email, companyNameX, companyInfoTop + 48);
 
-    // Invoice meta
+    doc.setDrawColor(30, 41, 59);
+    doc.setLineWidth(1.1);
+    doc.roundedRect(right - 134, y + 2, 134, 76, 8, 8);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("INVOICE", PAGE_WIDTH - 150, y + 15);
-
+    doc.setFontSize(10.5);
+    doc.text("SALE INVOICE", right - 67, y + 21, { align: "center" });
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Invoice No: ${invoiceNo}`, PAGE_WIDTH - 150, y + 35);
-    doc.text(`Date: ${dateStr}`, PAGE_WIDTH - 150, y + 50);
+    doc.setFontSize(8);
+    doc.text(`Invoice No: ${invoiceNo}`, right - 120, y + 40);
+    doc.text(`Invoice Date: ${formatDate(invoiceDate)}`, right - 120, y + 54);
+    doc.text(`Payment: ${getPaymentLabel(paymentMode)}`, right - 120, y + 68);
 
-    y += 110;
+    y += 100;
 
-    // Bill To
+    const addressLines = doc.splitTextToSize(
+      `Address: ${customerData.address || "-"}`,
+      320
+    );
+    const customerBoxHeight = Math.max(88, 32 + addressLines.length * 12 + 20);
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(left, y, pageWidth - left * 2, customerBoxHeight, 8, 8, "FD");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("Bill To:", LEFT, y);
+    doc.text("Bill To", left + 12, y + 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.2);
+    doc.text(customerData.name || "-", left + 12, y + 34);
+    doc.text(`Mobile: ${customerData.mobile || "-"}`, left + 12, y + 49);
+    doc.text(addressLines, left + 12, y + 66);
+    const gstY = y + 66 + addressLines.length * 11 + 6;
+    doc.text(`GST No: ${customerData.gst || "-"}`, left + 12, gstY);
 
-    doc.setFontSize(10);
-    doc.text(customerData.name || "-", LEFT, y + 18);
-    if (customerData.address) doc.text(customerData.address, LEFT, y + 34, { maxWidth: 260 });
-    if (customerData.mobile) doc.text(`Contact: ${customerData.mobile}`, LEFT, y + 50);
-    if (customerData.gst) doc.text(`GST: ${customerData.gst}`, LEFT, y + 66);
+    const paymentBoxX = pageWidth - 205;
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Summary", paymentBoxX, y + 18);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Cash: ${formatCurrency(cashAmount)}`, paymentBoxX, y + 38);
+    doc.text(`Online: ${formatCurrency(onlineAmount)}`, paymentBoxX, y + 54);
+    doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 70);
 
-    y += 90;
+    y += customerBoxHeight + 18;
 
-    // Items table
-    const rows = itemsList.map((it, i) => [
-      (i + 1).toString(),
-      it.Machine_Code || "-",
-      it.Serial_No || "-",
-      it.Model || "-",
-      it.CPU || "-",
-      it.Generation || "-",
-      it.RAM || "-",
-      it.storage || "-",
-      `₹ ${Number(it.price || 0).toFixed(2)}`,
+    const rows = itemsList.map((item, index) => [
+      String(index + 1),
+      item.itemType === "gift"
+        ? `Gift\n${getDisplayDescription(item)}`
+        : `Laptop\n${item.model || "-"}\nM/C: ${item.machineCode || "-"}\nS/N: ${item.serialNo || "-"}`,
+      String(item.quantity || 1),
+      formatCurrency(item.itemType === "gift" && item.isComplimentary ? 0 : item.unitPrice || 0),
+      formatCurrency(getLineTotal(item)),
     ]);
 
     autoTable(doc, {
-      head: [["#", "M.Code", "Serial No", "Model", "CPU", "Gen", "RAM", "Storage", "Price (₹)"]],
-      body: rows,
       startY: y,
-      styles: { fontSize: 9, cellPadding: 6 },
-      headStyles: {
-        fillColor: [30, 120, 210],
-        textColor: 255
-      },
+      head: [["#", "Item Details", "Qty", "Rate", "Amount"]],
+      body: rows,
       theme: "grid",
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 5,
+        lineColor: [203, 213, 225],
+        overflow: "linebreak",
+        valign: "top",
+      },
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: 255,
+      },
+      margin: { left, right: left, bottom: bottomMargin },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 45 },
-        2: { cellWidth: 90 },
-        3: { cellWidth: 95 },
-        4: { cellWidth: 45 },
-        5: { cellWidth: 35 },
-        6: { cellWidth: 45 },
-        7: { cellWidth: 60 },
-        8: { cellWidth: 75, halign: "right" },
+        0: { cellWidth: 26, halign: "center" },
+        1: { cellWidth: 295 },
+        2: { cellWidth: 42, halign: "center" },
+        3: { cellWidth: 74, halign: "right" },
+        4: { cellWidth: 86, halign: "right" },
       },
     });
 
-    const lastY = (doc as any).lastAutoTable.finalY;
+    const tableEndY = (doc as any).lastAutoTable.finalY;
 
-    // Subtotal / Total (right aligned)
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text(`Subtotal:  ₹ ${subtotal.toFixed(2)}`, PAGE_WIDTH - 100, lastY + 30, {
+    doc.setFontSize(10.5);
+    doc.text(`Subtotal: ${formatCurrency(subtotal)}`, right, tableEndY + 24, {
       align: "right",
     });
-
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text(`Total:  ₹ ${total.toFixed(2)}`, PAGE_WIDTH - 100, lastY + 55, {
+    doc.setFontSize(12.5);
+    doc.text(`Grand Total: ${formatCurrency(total)}`, right, tableEndY + 44, {
       align: "right",
     });
 
-    // --- TERMS BOX (EXPANDED HEIGHT + CLEAN SPACING) ---
-const termsStartY = lastY + 120;   // position below table + totals
-const boxWidth = PAGE_WIDTH - LEFT * 2;
-const boxHeight = 130;             // increased to prevent text overflow
+    const terms = [
+      "1. One month piece-to-piece replacement guarantee (excluding physical, liquid, or burn damage).",
+      "2. One year free service from invoice date. Spare parts, if needed, are chargeable.",
+      "3. Complimentary gift items, if any, are non-returnable and only for this invoice.",
+      "4. Goods once sold will be serviced as per warranty terms mentioned above.",
+      "5. Warranty will be covered only if the warranty seal is intact and the product condition remains the same as at the time of purchase.",
+    ];
+    const termLines = terms.flatMap((line) =>
+      doc.splitTextToSize(line, pageWidth - left * 2 - 24)
+    );
+    const termsBoxHeight = Math.max(98, 32 + termLines.length * 12 + 14);
+    const requiredHeightAfterTable = 58 + termsBoxHeight + 72;
+    let termsY = tableEndY + 66;
 
-// Terms Border Box
-doc.setDrawColor(0);
-doc.rect(LEFT, termsStartY, boxWidth, boxHeight);
+    if (termsY + requiredHeightAfterTable > pageHeight - bottomMargin) {
+      doc.addPage();
+      termsY = 52;
+    }
 
-// Title
-doc.setFont("helvetica", "bold");
-doc.setFontSize(11);
-doc.text("Warranty / Terms:", LEFT + 12, termsStartY + 20);
+    doc.roundedRect(left, termsY, pageWidth - left * 2, termsBoxHeight, 8, 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text("Warranty / Terms", left + 12, termsY + 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    let termY = termsY + 38;
+    terms.forEach((line) => {
+      const split = doc.splitTextToSize(line, pageWidth - left * 2 - 24);
+      doc.text(split, left + 12, termY);
+      termY += split.length * 12 + 2;
+    });
 
-// Terms List
-doc.setFont("helvetica", "normal");
-doc.setFontSize(9);
+    const signatureY = termsY + termsBoxHeight + 34;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("For FURTHERANCE TECHNOTREE PVT. LTD.", right - 210, signatureY);
+    doc.line(right - 210, signatureY + 36, right, signatureY + 36);
+    doc.setFont("helvetica", "normal");
+    doc.text("Authorized Signatory", right - 210, signatureY + 52);
 
-const terms = [
-  "1) One month piece-to-piece replacement guarantee* (not applicable for physical/water/burn damage).",
-  "2) One year free service from invoice date (labor only). Parts are chargeable if required.",
-  "*Replacement only if returned in original condition and verified by service team.",
-];
+    doc.setFontSize(8.5);
+    doc.setTextColor(100);
+    doc.text(
+      "This is a computer generated invoice.",
+      left,
+      signatureY + 52
+    );
 
-let ty = termsStartY + 38;
-terms.forEach((t) => {
-  doc.text(t, LEFT + 12, ty, { maxWidth: boxWidth - 24 });
-  ty += 14;
-});
-
-// --- SIGNATURE BLOCK (PLACED BELOW TERMS BOX CLEANLY) ---
-const signatureY = termsStartY + boxHeight + 40;
-
-doc.setFont("helvetica", "bold");
-doc.setFontSize(10);
-doc.text(`For ${company.name}`, PAGE_WIDTH - 280, signatureY);
-
-doc.setFont("helvetica", "normal");
-doc.text("Authorised Signatory:", PAGE_WIDTH - 280, signatureY + 28);
-
-// Signature Line
-doc.line(PAGE_WIDTH - 260, signatureY + 30, PAGE_WIDTH - 60, signatureY + 30);
-
-// --- FOOTER ---
-doc.setFontSize(8);
-doc.setTextColor(120);
-doc.text(
-  "This is an auto-generated invoice. No digital signature required.",
-  LEFT,
-  signatureY + 70
-);
-
-return doc.output("blob");
-
+    return doc.output("blob");
   };
 
+  const buildExtendedSalesItemPayload = (
+    saleId: number,
+    item: InvoiceItem,
+    fallbackLaptopId: number | null
+  ) => ({
+    sale_id: saleId,
+    invoice_id: saleId,
+    laptop_id:
+      item.itemType === "laptop" ? item.laptopId : fallbackLaptopId,
+    item_type: item.itemType,
+    description: getDisplayDescription(item),
+    quantity: item.quantity || 1,
+    unit_price: item.itemType === "gift" && item.isComplimentary ? 0 : item.unitPrice || 0,
+    line_total: getLineTotal(item),
+    is_complimentary: item.itemType === "gift" ? item.isComplimentary : false,
+    is_compliment: item.itemType === "gift" ? item.isComplimentary : false,
+    machine_code: item.itemType === "gift" ? "" : item.machineCode || "",
+    serial_no: item.itemType === "gift" ? "" : item.serialNo || "",
+    model: item.itemType === "gift" ? item.description || "Gift Item" : item.model || "",
+    cpu: item.itemType === "gift" ? "" : item.cpu || "",
+    generation: item.itemType === "gift" ? "" : item.generation || "",
+    ram: item.itemType === "gift" ? "" : item.ram || "",
+    storage: item.itemType === "gift" ? "" : item.storage || "",
+    price: getLineTotal(item),
+    amount: getLineTotal(item),
+  });
 
-  // Save invoice
-  const saveInvoice = async (shareOnWhatsapp = false) => {
-    // validations
-    if (!customer.name?.trim()) {
-      toast.error("Please enter customer name.");
-      return;
+  const buildLegacySalesItemPayload = (
+    saleId: number,
+    item: InvoiceItem,
+    fallbackLaptopId: number | null
+  ) => ({
+    sale_id: saleId,
+    invoice_id: saleId,
+    laptop_id:
+      item.itemType === "laptop" ? item.laptopId : fallbackLaptopId,
+    machine_code: item.itemType === "gift" ? "" : item.machineCode || "",
+    serial_no: item.itemType === "gift" ? "" : item.serialNo || "",
+    model:
+      item.itemType === "gift"
+        ? `GIFT: ${item.description || "Complimentary Item"}`
+        : item.model || "",
+    cpu: item.itemType === "gift" ? "" : item.cpu || "",
+    generation: item.itemType === "gift" ? "" : item.generation || "",
+    ram:
+      item.itemType === "gift"
+        ? `Qty ${item.quantity || 1}`
+        : item.ram || "",
+    storage:
+      item.itemType === "gift"
+        ? item.isComplimentary
+          ? "Complimentary"
+          : "Chargeable Gift"
+        : item.storage || "",
+    price: getLineTotal(item),
+    amount: getLineTotal(item),
+    description: getDisplayDescription(item),
+  });
+
+  const insertSaleItem = async (
+    saleId: number,
+    item: InvoiceItem,
+    fallbackLaptopId: number | null
+  ) => {
+    const extendedPayload = buildExtendedSalesItemPayload(
+      saleId,
+      item,
+      fallbackLaptopId
+    );
+    const { error } = await supabase.from("sales_items").insert(extendedPayload);
+
+    if (!error) return;
+
+    const message = error.message?.toLowerCase?.() || "";
+    const shouldFallback =
+      message.includes("column") ||
+      message.includes("schema cache") ||
+      message.includes("is_complimentary") ||
+      message.includes("item_type") ||
+      message.includes("laptop_id");
+
+    if (!shouldFallback) {
+      throw error;
     }
-    if (!items.length) {
-      toast.error("Add at least one item.");
-      return;
+
+    const { error: legacyError } = await supabase
+      .from("sales_items")
+      .insert(buildLegacySalesItemPayload(saleId, item, fallbackLaptopId));
+
+    if (legacyError) throw legacyError;
+  };
+
+  const insertSaleTransfer = async (
+    saleId: number,
+    item: InvoiceItem,
+    invoiceNo: string
+  ) => {
+    const basePayload = {
+      laptop_id: item.laptopId,
+      from_location: item.sourceLocation || "Main Warehouse",
+      to_location: "Sold",
+      person_name: customer.name,
+      contact_info: customer.mobile,
+      address: customer.address,
+      remarks: `Sold via ${invoiceNo}`,
+      transfer_date: new Date().toISOString(),
+      sale_invoice_id: saleId,
+    };
+
+    const { error } = await supabase.from("transfers").insert({
+      ...basePayload,
+      transfer_type: "sale",
+    });
+    if (!error) return;
+
+    const message = error.message?.toLowerCase?.() || "";
+
+    const candidatePayloads: any[] = [];
+
+    if (message.includes("transfer_type_check")) {
+      candidatePayloads.push({
+        ...basePayload,
+        transfer_type: getCompatibleTransferType(basePayload.from_location),
+      });
     }
-    if (paymentMode === "partial") {
-      // ensure numeric
-      const c = Number(cashAmount || 0);
-      const o = Number(onlineAmount || 0);
-      if (c + o !== Number(total)) {
-        toast(`For partial payment, Cash + Online must equal Total.`);
-        return;
+
+    if (message.includes("sale_invoice_id")) {
+      candidatePayloads.push({
+        ...basePayload,
+        transfer_type: "sale",
+      });
+    }
+
+    if (
+      message.includes("transfer_type_check") &&
+      message.includes("sale_invoice_id")
+    ) {
+      candidatePayloads.push({
+        ...basePayload,
+        transfer_type: getCompatibleTransferType(basePayload.from_location),
+      });
+    }
+
+    for (const candidate of candidatePayloads) {
+      const {
+        sale_invoice_id: _ignoredSaleInvoiceId,
+        ...withoutSaleInvoiceId
+      } = candidate;
+
+      const variants = [
+        candidate,
+        withoutSaleInvoiceId,
+      ];
+
+      for (const variant of variants) {
+        const { error: variantError } = await supabase
+          .from("transfers")
+          .insert(variant);
+
+        if (!variantError) return;
       }
+    }
+
+    throw error;
+  };
+
+  const saveInvoice = async (shareOnWhatsapp = false) => {
+    if (!customer.name.trim()) {
+      toast.error("Customer name required hai.");
+      return;
+    }
+
+    if (!items.length) {
+      toast.error("Kam se kam ek item add kijiye.");
+      return;
+    }
+
+    const invalidGift = items.some(
+      (item) => item.itemType === "gift" && !item.description.trim()
+    );
+    if (invalidGift) {
+      toast.error("Gift item ke liye description zaroor add kijiye.");
+      return;
+    }
+
+    const invalidLaptop = items.some(
+      (item) =>
+        item.itemType === "laptop" &&
+        ![item.machineCode, item.serialNo, item.model].some((value) =>
+          value.trim()
+        )
+    );
+    if (invalidLaptop) {
+      toast.error("Laptop item me machine code, serial no ya model zaroor bhariye.");
+      return;
+    }
+
+    if (
+      paymentMode === "partial" &&
+      Math.abs(Number(cashAmount || 0) + Number(onlineAmount || 0) - total) >
+        0.01
+    ) {
+      toast.error("Partial payment me Cash + Online total ke barabar hona chahiye.");
+      return;
     }
 
     setSaving(true);
@@ -371,8 +728,7 @@ return doc.output("blob");
     setInvoiceNoPreview(invoiceNo);
 
     try {
-      // Insert sale
-      const { data: saleRow, error: saleErr } = await supabase
+      const { data: saleRow, error: saleError } = await supabase
         .from("sales")
         .insert({
           invoice_no: invoiceNo,
@@ -383,201 +739,487 @@ return doc.output("blob");
           customer_gst: customer.gst || null,
           total_amount: total,
           payment_mode: paymentMode,
-          cash_amount: paymentMode === "cash" ? total : paymentMode === "partial" ? cashAmount : 0,
-          online_amount: paymentMode === "online" ? total : paymentMode === "partial" ? onlineAmount : 0,
+          cash_amount:
+            paymentMode === "cash"
+              ? total
+              : paymentMode === "partial"
+                ? Number(cashAmount || 0)
+                : 0,
+          online_amount:
+            paymentMode === "online"
+              ? total
+              : paymentMode === "partial"
+                ? Number(onlineAmount || 0)
+                : 0,
         })
         .select()
         .single();
 
-      if (saleErr || !saleRow) {
-        throw new Error(saleErr?.message || "Failed to create sale record");
+      if (saleError || !saleRow) {
+        throw new Error(saleError?.message || "Sale record create nahi hua.");
       }
-      const saleId = saleRow.id;
 
-      // insert sales_items and update laptop status / transfers
-      for (const it of items) {
-        const { error: itemErr } = await supabase.from("sales_items").insert({
-          sale_id: saleId,
-          laptop_id: it.laptop_id ?? null,
-          machine_code: it.machine_code ?? "",
-          serial_no: it.serial_no ?? "",
-          model: it.model ?? "",
-          cpu: it.cpu ?? "",
-          generation: it.generation ?? "",
-          ram: it.ram ?? "",
-          storage: it.storage ?? "",
-          price: Number(it.price || 0),
-        });
-        if (itemErr) console.warn("sales_items insert error:", itemErr.message);
+      const fallbackLaptopId = getFallbackLaptopId(items);
 
-        if (it.laptop_id) {
-          const { error: updErr } = await supabase
+      for (const item of items) {
+        await insertSaleItem(saleRow.id, item, fallbackLaptopId);
+
+        if (item.itemType === "laptop" && item.laptopId) {
+          const { error: updateError } = await supabase
             .from("laptop_tests")
             .update({ status: "sold" })
-            .eq("id", it.laptop_id);
-          if (updErr) console.warn("laptop update error:", updErr.message);
+            .eq("id", item.laptopId);
 
-          const { error: transferErr } = await supabase.from("transfers").insert({
-            laptop_id: it.laptop_id,
-            transfer_type: "sale",
-            from_location: "Main Warehouse",
-            to_location: "Sold",
-            transfer_date: new Date().toISOString(),
-            sale_invoice_id: saleId,
-          });
-          if (transferErr) console.warn("transfer insert error:", transferErr.message);
+          if (updateError) {
+            throw updateError;
+          }
+
+          await insertSaleTransfer(saleRow.id, item, invoiceNo);
         }
       }
 
-      toast.success("Invoice saved successfully.");
+      const pdfBlob = await generatePdfBlob(invoiceNo, items, customer);
+      const filename = `${invoiceNo}.pdf`;
+      const filePath = `invoices/${filename}`;
+      let publicUrl = "";
+      let shareUrl = "";
 
-      // Generate PDF
-      const pdfBlob = await generatePdfBlob(invoiceNo, saleRow, items, customer, invoiceDate, COMPANY);
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, pdfBlob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
 
-      // Upload PDF
-      const filename = `${invoiceNo}_${saleId}.pdf`;
-      const path = `invoices/${filename}`;
+      if (uploadError) {
+        console.warn("Invoice upload error:", uploadError.message);
+        if (uploadError.message?.toLowerCase().includes("bucket not found")) {
+          toast("Invoice save ho gayi, lekin Supabase storage bucket `invoices` nahi mila.");
+        } else {
+          toast("Invoice save ho gayi, lekin PDF upload nahi ho payi.");
+        }
+      } else {
+        const publicUrlResult = supabase.storage
+          .from(STORAGE_BUCKET)
+          .getPublicUrl(filePath);
+
+        publicUrl = publicUrlResult.data.publicUrl || "";
+
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+
+        if (!signedError && signedData?.signedUrl) {
+          shareUrl = signedData.signedUrl;
+        }
+
+        const { error: updatePdfMetaError } = await supabase
+          .from("sales")
+          .update({
+            invoice_pdf_url: publicUrl,
+            invoice_file_path: filePath,
+          })
+          .eq("id", saleRow.id);
+
+        if (updatePdfMetaError) {
+          console.warn("sales PDF meta update skipped:", updatePdfMetaError.message);
+        }
+      }
 
       try {
-        const { error: uploadErr } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(path, pdfBlob, { contentType: "application/pdf", upsert: true });
-
-        let publicUrl = "";
-        if (uploadErr) {
-          console.warn("Storage upload error:", uploadErr.message);
-          // neutral toast (sonner does not have .warning in some versions)
-          toast("PDF upload failed. You can still download the PDF locally.");
-        } else {
-          const { publicURL } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-          publicUrl = publicURL || "";
-        }
-
-        // open PDF in new tab
-        try {
-          const blobUrl = URL.createObjectURL(pdfBlob);
-          window.open(blobUrl, "_blank");
-        } catch { }
-
-        // WhatsApp share
-        if (shareOnWhatsapp) {
-          const phone = (customer.mobile || "").replace(/\D/g, "");
-          const waText = `Hello ${customer.name},\nYour invoice (${invoiceNo}) is ready.\n${publicUrl ? `Download PDF: ${publicUrl}` : `We couldn't upload the file. Please contact.`}`;
-          const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(waText)}`;
-          window.open(waUrl, "_blank");
-        }
-      } catch (e) {
-        console.error("upload catch", e);
-        toast("Invoice saved but PDF upload failed.");
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, "_blank");
+      } catch {
+        console.warn("Could not open generated PDF preview.");
       }
 
-      setSaving(false);
-      // navigate back to inventory
-      navigate("/laptop-inventory");
-      return;
-    } catch (err: any) {
-      console.error("saveInvoice error:", err);
-      toast.error("Failed to save invoice: " + (err?.message || ""));
+      if (shareOnWhatsapp && customer.mobile.trim()) {
+        let phone = customer.mobile.replace(/\D/g, "");
+        if (phone.length === 10) {
+          phone = `91${phone}`;
+        }
+        const message = [
+          `Hello ${customer.name},`,
+          `Your invoice ${invoiceNo} is ready.`,
+          shareUrl
+            ? `Download PDF: ${shareUrl}`
+            : publicUrl
+              ? `Download PDF: ${publicUrl}`
+              : "Invoice PDF upload pending.",
+          `Total Amount: ${formatCurrency(total)}`,
+        ].join("\n");
+        window.open(
+          `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+          "_blank"
+        );
+      }
+
+      toast.success("Sale invoice successfully save ho gayi.");
+      navigate("/sales");
+    } catch (error: any) {
+      console.error("saveInvoice error:", error);
+      const rawMessage = error?.message || "Unknown error";
+      if (rawMessage.toLowerCase().includes("row-level security policy")) {
+        toast.error(
+          "Supabase policy missing hai: `sales`/`sales_items` table par insert allow kijiye."
+        );
+      } else {
+        toast.error(`Invoice save nahi ho payi: ${rawMessage}`);
+      }
+    } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p className="p-6 text-gray-500">Loading invoice page...</p>;
+  if (loading) {
+    return <p className="p-6 text-gray-500">Loading invoice page...</p>;
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-4">Create Invoice</h2>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Create Sale Invoice</h1>
+          <p className="text-sm text-gray-500">
+            As soon as the sale is saved, the laptop will be marked as 'Sold' in the inventory and added to the sales list.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/laptop-inventory")}
+          className="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50"
+        >
+          Back to Inventory
+        </button>
+      </div>
 
-      <div className="bg-white p-4 rounded shadow">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium">Invoice No</label>
-            <input className="border p-2 w-full" value={invoiceNoPreview} readOnly />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Invoice Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Invoice No
+            </label>
             <input
-              type="date"
-              className="border p-2 w-full"
-              value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
+              className="border p-2.5 w-full rounded-lg bg-gray-50"
+              value={invoiceNoPreview}
+              readOnly
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Invoice Date
+            </label>
+            <input
+              type="date"
+              className="border p-2.5 w-full rounded-lg"
+              value={invoiceDate}
+              onChange={(event) => setInvoiceDate(event.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Payment Mode
+            </label>
+            <select
+              value={paymentMode}
+              onChange={(event) =>
+                setPaymentMode(event.target.value as "cash" | "online" | "partial")
+              }
+              className="border p-2.5 w-full rounded-lg"
+            >
+              <option value="cash">Cash</option>
+              <option value="online">Online</option>
+              <option value="partial">Partial (Cash + Online)</option>
+            </select>
+          </div>
         </div>
 
-        <div className="mt-4">
-          <h3 className="font-semibold">Customer Details</h3>
-          <input className="border p-2 w-full my-2" placeholder="Customer Name" value={customer.name}
-            onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
-          <input className="border p-2 w-full my-2" placeholder="Mobile (10 digits)" value={customer.mobile}
-            onChange={(e) => setCustomer({ ...customer, mobile: e.target.value })} />
-          <textarea className="border p-2 w-full my-2" placeholder="Address" value={customer.address}
-            onChange={(e) => setCustomer({ ...customer, address: e.target.value })} />
-          <input className="border p-2 w-full my-2" placeholder="GST No (optional)" value={customer.gst}
-            onChange={(e) => setCustomer({ ...customer, gst: e.target.value })} />
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="border border-gray-200 rounded-2xl p-4">
+            <h2 className="font-semibold text-gray-900 mb-3">Customer Details</h2>
+            <div className="space-y-3">
+              <input
+                className="border p-2.5 w-full rounded-lg"
+                placeholder="Customer Name"
+                value={customer.name}
+                onChange={(event) =>
+                  setCustomer((current) => ({ ...current, name: event.target.value }))
+                }
+              />
+              <input
+                className="border p-2.5 w-full rounded-lg"
+                placeholder="Mobile Number"
+                value={customer.mobile}
+                onChange={(event) =>
+                  setCustomer((current) => ({ ...current, mobile: event.target.value }))
+                }
+              />
+              <textarea
+                className="border p-2.5 w-full rounded-lg min-h-[92px]"
+                placeholder="Customer Address"
+                value={customer.address}
+                onChange={(event) =>
+                  setCustomer((current) => ({ ...current, address: event.target.value }))
+                }
+              />
+              <input
+                className="border p-2.5 w-full rounded-lg"
+                placeholder="GST Number (optional)"
+                value={customer.gst}
+                onChange={(event) =>
+                  setCustomer((current) => ({ ...current, gst: event.target.value }))
+                }
+              />
+            </div>
+          </div>
 
-        <div className="mt-4">
-          <h3 className="font-semibold">Items</h3>
-          {items.map((it, idx) => (
-            <div key={idx} className="p-3 border rounded mb-2 grid grid-cols-2 gap-2">
-              <div>
-                <input placeholder="Machine Code" className="border p-2 w-full mb-2" value={it.machine_code || ""} onChange={(e) => updateItem(idx, "Machine_Code", e.target.value)} />
-                <input placeholder="Serial No" className="border p-2 w-full mb-2" value={it.serial_no || ""} onChange={(e) => updateItem(idx, "Serial_No", e.target.value)} />
-                <input placeholder="Model" className="border p-2 w-full mb-2" value={it.model || ""} onChange={(e) => updateItem(idx, "Model", e.target.value)} />
-                <div className="flex gap-2">
-                  <input placeholder="CPU" className="border p-2 w-full" value={it.cpu || ""} onChange={(e) => updateItem(idx, "CPU", e.target.value)} />
-                  <input placeholder="Generation" className="border p-2 w-full" value={it.generation || ""} onChange={(e) => updateItem(idx, "Generation", e.target.value)} />
-                </div>
+          <div className="border border-gray-200 rounded-2xl p-4">
+            <h2 className="font-semibold text-gray-900 mb-3">Payment Summary</h2>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-base text-gray-900">
+                <span>Grand Total</span>
+                <span>{formatCurrency(total)}</span>
               </div>
 
-              <div>
-                <input placeholder="RAM" className="border p-2 w-full mb-2" value={it.ram || ""} onChange={(e) => updateItem(idx, "RAM", e.target.value)} />
-                <input placeholder="Storage" className="border p-2 w-full mb-2" value={it.storage || ""} onChange={(e) => updateItem(idx, "storage", e.target.value)} />
-                <input placeholder="Price (₹)" type="number" className="border p-2 w-full mb-2" value={String(it.price || "")} onChange={(e) => updateItem(idx, "price", e.target.value)} />
-                {items.length > 1 && <button type="button" className="text-red-600" onClick={() => removeItem(idx)}>Remove</button>}
+              {paymentMode === "partial" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Cash Amount"
+                    value={String(cashAmount || "")}
+                    onChange={(event) =>
+                      setCashAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Online Amount"
+                    value={String(onlineAmount || "")}
+                    onChange={(event) =>
+                      setOnlineAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <p className="md:col-span-2 text-xs text-gray-500">
+                    Cash + Online exactly {formatCurrency(total)} hona chahiye.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-semibold text-gray-900">Invoice Items</h2>
+              <p className="text-sm text-gray-500">
+                You can also add complimentary or chargeable gift items along with the laptop.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg"
+                onClick={addLaptopItem}
+              >
+                + Add Laptop
+              </button>
+              <button
+                type="button"
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg"
+                onClick={addGiftItem}
+              >
+                + Add Gift
+              </button>
+            </div>
+          </div>
+
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              className="border border-gray-200 rounded-2xl p-4 bg-gray-50"
+            >
+              <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    Item {index + 1}{" "}
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-white border border-gray-200 ml-2">
+                      {item.itemType === "gift" ? "Gift Item" : "Laptop"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {item.itemType === "gift"
+                      ? "Gift line invoice aur report dono me capture hogi."
+                      : "After the laptop sale, the inventory status will change to Sold."}
+                  </p>
+                </div>
+
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    className="text-red-600 text-sm"
+                    onClick={() => removeItem(item.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {item.itemType === "gift" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    className="border p-2.5 rounded-lg md:col-span-2"
+                    placeholder="Gift Description"
+                    value={item.description}
+                    onChange={(event) =>
+                      updateItem(item.id, "description", event.target.value)
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Quantity"
+                    value={String(item.quantity || 1)}
+                    onChange={(event) =>
+                      updateItem(item.id, "quantity", event.target.value)
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Gift Value / Price"
+                    value={String(item.unitPrice || "")}
+                    onChange={(event) =>
+                      updateItem(item.id, "unitPrice", event.target.value)
+                    }
+                    disabled={item.isComplimentary}
+                  />
+                  <label className="md:col-span-2 flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={item.isComplimentary}
+                      onChange={(event) =>
+                        updateItem(item.id, "isComplimentary", event.target.checked)
+                      }
+                    />
+                    Complimentary gift
+                  </label>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Machine Code"
+                    value={item.machineCode}
+                    onChange={(event) =>
+                      updateItem(item.id, "machineCode", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Serial No"
+                    value={item.serialNo}
+                    onChange={(event) =>
+                      updateItem(item.id, "serialNo", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Model"
+                    value={item.model}
+                    onChange={(event) =>
+                      updateItem(item.id, "model", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="CPU"
+                    value={item.cpu}
+                    onChange={(event) =>
+                      updateItem(item.id, "cpu", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Generation"
+                    value={item.generation}
+                    onChange={(event) =>
+                      updateItem(item.id, "generation", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="RAM"
+                    value={item.ram}
+                    onChange={(event) =>
+                      updateItem(item.id, "ram", event.target.value)
+                    }
+                  />
+                  <input
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Storage"
+                    value={item.storage}
+                    onChange={(event) =>
+                      updateItem(item.id, "storage", event.target.value)
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Sale Price"
+                    value={String(item.unitPrice || "")}
+                    onChange={(event) =>
+                      updateItem(item.id, "unitPrice", event.target.value)
+                    }
+                  />
+                </div>
+              )}
+
+              <div className="mt-3 text-right text-sm font-semibold text-gray-800">
+                Line Total: {formatCurrency(getLineTotal(item))}
               </div>
             </div>
           ))}
+        </div>
 
-          <div className="flex gap-2 items-center">
-            <button type="button" className="bg-gray-200 px-3 py-1 rounded" onClick={addItem}>+ Add item</button>
-
-            <div className="ml-auto space-x-2">
-              <label className="mr-2">Payment:</label>
-              <select value={paymentMode} onChange={(e) => { const v = e.target.value as any; setPaymentMode(v); if (v === "cash") { setCashAmount(total); setOnlineAmount(0); } if (v === "online") { setOnlineAmount(total); setCashAmount(0); } }} className="border p-2 rounded">
-                <option value="cash">Cash</option>
-                <option value="online">Online</option>
-                <option value="partial">Partial (Cash + Online)</option>
-              </select>
-            </div>
-          </div>
-
-          {paymentMode === "partial" && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <input type="number" className="border p-2" placeholder="Cash amount" value={String(cashAmount || "")} onChange={(e) => setCashAmount(Number(e.target.value || 0))} />
-              <input type="number" className="border p-2" placeholder="Online amount" value={String(onlineAmount || "")} onChange={(e) => setOnlineAmount(Number(e.target.value || 0))} />
-              <div className="col-span-2 text-sm text-gray-600">Total must equal ₹{total.toFixed(2)} (Cash + Online)</div>
-            </div>
-          )}
-
-          <div className="mt-4 flex justify-end gap-2">
-            <div className="inline-block text-left mr-4">
-              <div>Subtotal: ₹{subtotal.toFixed(2)}</div>
-              <div className="text-lg font-semibold">Total: ₹{total.toFixed(2)}</div>
-            </div>
-
-            <div className="space-x-2">
-              <button type="button" className="bg-blue-600 text-white px-4 py-2 rounded" onClick={() => saveInvoice(false)} disabled={saving}>
-                {saving ? "Saving..." : "Save Invoice"}
-              </button>
-
-              <button type="button" className="bg-green-600 text-white px-4 py-2 rounded" onClick={() => saveInvoice(true)} disabled={saving}>
-                {saving ? "Saving..." : "Save & Share (WhatsApp)"}
-              </button>
-            </div>
-          </div>
+        <div className="flex justify-end gap-3 flex-wrap">
+          <button
+            type="button"
+            className="border border-gray-300 px-5 py-2.5 rounded-lg hover:bg-gray-50"
+            onClick={() => navigate("/laptop-inventory")}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg"
+            onClick={() => saveInvoice(false)}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save Invoice"}
+          </button>
+          <button
+            type="button"
+            className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg"
+            onClick={() => saveInvoice(true)}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save & Share"}
+          </button>
         </div>
       </div>
     </div>

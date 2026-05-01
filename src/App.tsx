@@ -14,6 +14,7 @@ import Returns from "@/pages/Returns";
 import Reports from "@/pages/Reports";
 import EditReport from "@/pages/EditReport";
 import CreateInvoice from "@/pages/CreateInvoice";
+import Sales from "@/pages/Sales";
 import Navbar from "@/components/Navbar";
 import AutoLogout from "@/components/AutoLogout";
 
@@ -144,6 +145,15 @@ export default function App() {
             element={
               <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
                 <Reports />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/sales"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <Sales />
               </PrivateRoute>
             }
           />

@@ -49,7 +49,7 @@ export default function LaptopInventory() {
       })
     );
 
-    setLaptops(enriched);
+    setLaptops(enriched.filter((lap) => lap.status !== "sold"));
     setLoading(false);
   };
 
@@ -60,7 +60,9 @@ export default function LaptopInventory() {
 
     // ✅ Allow SALE from ANY location
     if (isSale) {
-      navigate(`/invoice/${laptop.id}`);
+      navigate(`/invoice/${laptop.id}`, {
+        state: { currentLocation: laptop.current_location || "Main Warehouse" },
+      });
       return;
     }
 
@@ -87,8 +89,8 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
 
         if (checkError) throw checkError;
 
-        if (existing && existing.length > 0) {
-          toast.error(`⚠️ ${laptop.serialNo} already transferred to FTT Retail.`);
+        if (existing && existing.length > 0 && laptop.current_location === "FTT Retail") {
+          toast.error(`⚠️ ${laptop.SerialNo || laptop.MashinCode || "Laptop"} already transferred to FTT Retail.`);
           return;
         }
 
@@ -101,7 +103,7 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
         });
 
         if (error) throw error;
-        toast.success(`${laptop.serialNo} transferred to FTT Retail ✅`);
+        toast.success(`${laptop.SerialNo || laptop.MashinCode || "Laptop"} transferred to FTT Retail ✅`);
         fetchLaptops();
         return;
       }
@@ -117,7 +119,7 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
         });
 
         if (error) throw error;
-        toast.success(`${laptop.serialNo} returned to Main Warehouse ✅`);
+        toast.success(`${laptop.SerialNo || laptop.MashinCode || "Laptop"} returned to Main Warehouse ✅`);
         fetchLaptops();
         return;
       }

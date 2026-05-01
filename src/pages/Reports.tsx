@@ -13,6 +13,7 @@ export default function Reports() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const [salesMap, setSalesMap] = useState<Record<string, any>>({});
   const [search, setSearch] = useState(""); // <-- ADDED: Search state
   const [user, setUser] = useState<any>(() => {
     const cached = localStorage.getItem("user");
@@ -99,6 +100,51 @@ useEffect(() => {
 
         const { data: reportData } = await query;
         setReports(reportData || []);
+
+        const [{ data: salesData }, { data: salesItemsData }] = await Promise.all([
+          supabase.from("sales").select("*"),
+          supabase.from("sales_items").select("*"),
+        ]);
+
+        const saleByLaptop: Record<string, any> = {};
+        const groupedGifts: Record<string, string[]> = {};
+
+        (salesItemsData || []).forEach((item: any) => {
+          const saleId = String(item.sale_id);
+          const isGift =
+            item.item_type === "gift" ||
+            (item.model || "").toString().startsWith("GIFT:");
+
+          if (isGift) {
+            const giftLabel =
+              item.description ||
+              (item.model || "").toString().replace(/^GIFT:\s*/, "") ||
+              "Gift Item";
+            groupedGifts[saleId] = [...(groupedGifts[saleId] || []), giftLabel];
+            return;
+          }
+
+          if (item.laptop_id) {
+            saleByLaptop[String(item.laptop_id)] = item;
+          }
+        });
+
+        const saleMap: Record<string, any> = {};
+        (salesData || []).forEach((sale: any) => {
+          saleMap[String(sale.id)] = {
+            ...sale,
+            gift_items: groupedGifts[String(sale.id)] || [],
+          };
+        });
+
+        const mergedSalesMap: Record<string, any> = {};
+        Object.entries(saleByLaptop).forEach(([laptopId, saleItem]) => {
+          mergedSalesMap[laptopId] = {
+            item: saleItem,
+            sale: saleMap[String((saleItem as any).sale_id)] || null,
+          };
+        });
+        setSalesMap(mergedSalesMap);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load reports");
@@ -314,6 +360,7 @@ useEffect(() => {
     const formatted = reports.map((r) => {
       // 🧠 Find the latest transfer for this laptop
       const transfer = transfers?.find((t) => t.laptop_id === r.id);
+      const saleInfo = salesMap[String(r.id)] || null;
 
       return {
         MachineCode: r.MashinCode,
@@ -339,6 +386,23 @@ useEffect(() => {
         ReceiverContact: transfer?.contact_info || "—",
         ReceiverAddress: transfer?.address || "—",
         TransferRemarks: transfer?.remarks || "—",
+        CurrentStatus: r.status || "in_stock",
+
+        // Sale / invoice info
+        SaleInvoiceNo: saleInfo?.sale?.invoice_no || "—",
+        SaleDate: saleInfo?.sale?.invoice_date
+          ? new Date(saleInfo.sale.invoice_date).toLocaleDateString()
+          : "—",
+        SaleAmount:
+          saleInfo?.item?.line_total ??
+          saleInfo?.item?.price ??
+          "—",
+        SaleCustomer: saleInfo?.sale?.customer_name || "—",
+        SaleCustomerMobile: saleInfo?.sale?.customer_mobile || "—",
+        SaleCustomerAddress: saleInfo?.sale?.customer_address || "—",
+        SaleCustomerGST: saleInfo?.sale?.customer_gst || "—",
+        SalePaymentMode: saleInfo?.sale?.payment_mode || "—",
+        SaleGiftItems: saleInfo?.sale?.gift_items?.join(", ") || "—",
 
         // 🗒️ Internal Remarks from test
         TestRemarks: r.remarks || "—",
