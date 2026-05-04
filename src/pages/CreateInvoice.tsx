@@ -24,6 +24,7 @@ type InvoiceItem = {
   generation: string;
   ram: string;
   storage: string;
+  graphicCard: string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -70,6 +71,7 @@ const createEmptyLaptopItem = (): InvoiceItem => ({
   generation: "",
   ram: "",
   storage: "",
+  graphicCard: "",
   description: "",
   quantity: 1,
   unitPrice: 0,
@@ -88,6 +90,7 @@ const createGiftItem = (): InvoiceItem => ({
   generation: "",
   ram: "",
   storage: "",
+  graphicCard: "",
   description: "",
   quantity: 1,
   unitPrice: 0,
@@ -118,8 +121,9 @@ const getLaptopDescription = (item: InvoiceItem) =>
     item.model,
     item.cpu,
     item.generation ? `${item.generation} Gen` : "",
-    item.ram,
+    item.ram ? `RAM ${item.ram}` : "",
     item.storage,
+    item.graphicCard,
   ]
     .filter(Boolean)
     .join(" | ");
@@ -136,7 +140,7 @@ const getInvoiceItemDetails = (item: InvoiceItem) => {
       : getDisplayDescription(item);
   }
 
-  return `Laptop\n${item.model || "-"}\nM/C: ${item.machineCode || "-"}\nS/N: ${item.serialNo || "-"}`;
+  return `Laptop\n${getLaptopDescription(item) || item.model || "-"}\nM/C: ${item.machineCode || "-"}\nS/N: ${item.serialNo || "-"}`;
 };
 
 const getPaymentLabel = (mode: PaymentMode) => {
@@ -145,6 +149,20 @@ const getPaymentLabel = (mode: PaymentMode) => {
   if (mode === "partial") return "Partial";
   if (mode === "finance_card") return "Bajaj Finance / Credit Card";
   return "On Credit";
+};
+
+const getDpPaymentLabel = (mode: "cash" | "online") =>
+  mode === "online" ? "Online" : "Cash";
+
+const getInvoiceBoxPaymentLabel = (
+  mode: PaymentMode,
+  dpPaymentMode: "cash" | "online"
+) => {
+  if (mode === "finance_card") {
+    return `Bajaj Finance / Card (${getDpPaymentLabel(dpPaymentMode)} DP)`;
+  }
+
+  return getPaymentLabel(mode);
 };
 
 const normalizePositiveNumber = (value: string | number) => {
@@ -217,6 +235,7 @@ export default function CreateInvoice() {
   const [onlineAmount, setOnlineAmount] = useState(0);
   const [financeDpAmount, setFinanceDpAmount] = useState(0);
   const [installmentCount, setInstallmentCount] = useState(0);
+  const [dpPaymentMode, setDpPaymentMode] = useState<"cash" | "online">("cash");
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + getLineTotal(item), 0),
@@ -239,10 +258,10 @@ export default function CreateInvoice() {
     }
 
     if (paymentMode === "finance_card") {
-      setOnlineAmount(0);
-      setCashAmount(0);
+      setCashAmount(dpPaymentMode === "cash" ? financeDpAmount : 0);
+      setOnlineAmount(dpPaymentMode === "online" ? financeDpAmount : 0);
     }
-  }, [paymentMode, total]);
+  }, [paymentMode, total, financeDpAmount, dpPaymentMode]);
 
   const generateInvoiceNo = async (): Promise<string> => {
     try {
@@ -271,7 +290,7 @@ export default function CreateInvoice() {
 
     const { data, error } = await supabase
       .from("laptop_tests")
-      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, status")
+      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, GraphicCard, status")
       .eq("MashinCode", Number(trimmedCode))
       .maybeSingle();
 
@@ -305,17 +324,18 @@ export default function CreateInvoice() {
       current.map((item) =>
         item.id === itemId
           ? {
-              ...item,
-              laptopId: data.id,
-              machineCode: String(data.MashinCode ?? ""),
-              serialNo: data.SerialNo ?? "",
-              model: data.Model ?? "",
-              cpu: data.CPU ?? "",
-              generation: data.Gen ?? "",
-              ram: data.RAM ?? "",
-              storage: data.SSDHdd ?? "",
-              sourceLocation,
-            }
+            ...item,
+            laptopId: data.id,
+            machineCode: String(data.MashinCode ?? ""),
+            serialNo: data.SerialNo ?? "",
+            model: data.Model ?? "",
+            cpu: data.CPU ?? "",
+            generation: data.Gen ?? "",
+            ram: data.RAM ?? "",
+            storage: data.SSDHdd ?? "",
+            graphicCard: data.GraphicCard ?? "",
+            sourceLocation,
+          }
           : item
       )
     );
@@ -360,13 +380,16 @@ export default function CreateInvoice() {
         setOnlineAmount(Number(saleData.online_amount || 0));
         setFinanceDpAmount(Number(saleData.finance_dp_amount || 0));
         setInstallmentCount(Number(saleData.installment_count || 0));
+        setDpPaymentMode(
+          saleData.dp_payment_mode === "online" ? "online" : "cash"
+        );
 
         const hydratedItems =
           (saleItemsData || []).map((item: any) => ({
             id: createId(),
             itemType:
               item.item_type === "gift" ||
-              String(item.model || "").startsWith("GIFT:")
+                String(item.model || "").startsWith("GIFT:")
                 ? "gift"
                 : "laptop",
             laptopId: item.laptop_id ?? null,
@@ -380,6 +403,7 @@ export default function CreateInvoice() {
             generation: item.generation || "",
             ram: item.ram || "",
             storage: item.storage || "",
+            graphicCard: item.graphic_card || "",
             description:
               item.description ||
               String(item.model || "").replace(/^GIFT:\s*/, "") ||
@@ -406,7 +430,7 @@ export default function CreateInvoice() {
       const laptopId = Number(id);
       const { data, error } = await supabase
         .from("laptop_tests")
-        .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, status")
+        .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, GraphicCard, status")
         .eq("id", laptopId)
         .single();
 
@@ -442,6 +466,7 @@ export default function CreateInvoice() {
           generation: data.Gen ?? "",
           ram: data.RAM ?? "",
           storage: data.SSDHdd ?? "",
+          graphicCard: data.GraphicCard ?? "",
           description: "",
           quantity: 1,
           unitPrice: 0,
@@ -519,7 +544,7 @@ export default function CreateInvoice() {
 
     const companyNameX = left + 58;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.text(COMPANY.name, companyNameX, y + 12);
 
     doc.setFont("helvetica", "normal");
@@ -533,7 +558,7 @@ export default function CreateInvoice() {
 
     doc.setDrawColor(30, 41, 59);
     doc.setLineWidth(1.1);
-    doc.roundedRect(right - 134, y + 2, 134, 76, 8, 8);
+    doc.roundedRect(right - 150, y + 2, 150, 82, 8, 8);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10.5);
     doc.text("SALE INVOICE", right - 67, y + 21, { align: "center" });
@@ -541,7 +566,14 @@ export default function CreateInvoice() {
     doc.setFontSize(8);
     doc.text(`Invoice No: ${invoiceNo}`, right - 120, y + 40);
     doc.text(`Invoice Date: ${formatDate(invoiceDate)}`, right - 120, y + 54);
-    doc.text(`Payment: ${getPaymentLabel(paymentMode)}`, right - 120, y + 68);
+    const paymentText = `Payment: ${getInvoiceBoxPaymentLabel(
+      paymentMode,
+      dpPaymentMode
+    )}`;
+
+    const wrappedPayment = doc.splitTextToSize(paymentText, 110);
+
+    doc.text(wrappedPayment, right - 120, y + 66);
 
     y += 100;
 
@@ -549,7 +581,11 @@ export default function CreateInvoice() {
       `Address: ${customerData.address || "-"}`,
       320
     );
-    const customerBoxHeight = Math.max(88, 32 + addressLines.length * 12 + 20);
+    const paymentSummaryHeight = paymentMode === "finance_card" ? 118 : 88;
+    const customerBoxHeight = Math.max(
+      paymentSummaryHeight,
+      32 + addressLines.length * 12 + 20
+    );
 
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(left, y, pageWidth - left * 2, customerBoxHeight, 8, 8, "FD");
@@ -570,7 +606,17 @@ export default function CreateInvoice() {
     doc.setFont("helvetica", "normal");
     doc.text(`Cash: ${formatCurrency(cashAmount)}`, paymentBoxX, y + 38);
     doc.text(`Online: ${formatCurrency(onlineAmount)}`, paymentBoxX, y + 54);
-    doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 70);
+    if (paymentMode === "finance_card") {
+      doc.text(
+        `DP (${getDpPaymentLabel(dpPaymentMode)}): ${formatCurrency(financeDpAmount)}`,
+        paymentBoxX,
+        y + 70
+      );
+      doc.text(`EMI Count: ${installmentCount || 0}`, paymentBoxX, y + 86);
+      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 102);
+    } else {
+      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 70);
+    }
 
     y += customerBoxHeight + 18;
 
@@ -695,6 +741,7 @@ export default function CreateInvoice() {
     generation: item.itemType === "gift" ? "" : item.generation || "",
     ram: item.itemType === "gift" ? "" : item.ram || "",
     storage: item.itemType === "gift" ? "" : item.storage || "",
+    graphic_card: item.itemType === "gift" ? "" : item.graphicCard || "",
     price: getLineTotal(item),
     amount: getLineTotal(item),
   });
@@ -726,6 +773,7 @@ export default function CreateInvoice() {
           ? "Complimentary"
           : "Chargeable Gift"
         : item.storage || "",
+    graphic_card: item.itemType === "gift" ? "" : item.graphicCard || "",
     price: getLineTotal(item),
     amount: getLineTotal(item),
     description: getDisplayDescription(item),
@@ -751,6 +799,7 @@ export default function CreateInvoice() {
       message.includes("schema cache") ||
       message.includes("is_complimentary") ||
       message.includes("item_type") ||
+      message.includes("graphic_card") ||
       message.includes("laptop_id");
 
     if (!shouldFallback) {
@@ -872,7 +921,7 @@ export default function CreateInvoice() {
     if (
       paymentMode === "partial" &&
       Math.abs(Number(cashAmount || 0) + Number(onlineAmount || 0) - total) >
-        0.01
+      0.01
     ) {
       toast.error("Partial payment me Cash + Online total ke barabar hona chahiye.");
       return;
@@ -921,6 +970,7 @@ export default function CreateInvoice() {
               : 0,
         finance_dp_amount: paymentMode === "finance_card" ? Number(financeDpAmount || 0) : 0,
         installment_count: paymentMode === "finance_card" ? Number(installmentCount || 0) : 0,
+        dp_payment_mode: paymentMode === "finance_card" ? dpPaymentMode : null,
       };
 
       const saleMutation = isEditMode
@@ -1221,6 +1271,16 @@ export default function CreateInvoice() {
 
               {paymentMode === "finance_card" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <select
+                    value={dpPaymentMode}
+                    onChange={(event) =>
+                      setDpPaymentMode(event.target.value as "cash" | "online")
+                    }
+                    className="border p-2.5 rounded-lg"
+                  >
+                    <option value="cash">DP Received in Cash</option>
+                    <option value="online">DP Received Online</option>
+                  </select>
                   <input
                     type="number"
                     min="0"
@@ -1241,6 +1301,9 @@ export default function CreateInvoice() {
                       setInstallmentCount(normalizePositiveNumber(event.target.value))
                     }
                   />
+                  <p className="md:col-span-2 text-xs text-gray-500">
+                    DP amount selected mode me capture hoga, aur remaining amount financed mana jayega.
+                  </p>
                 </div>
               )}
 

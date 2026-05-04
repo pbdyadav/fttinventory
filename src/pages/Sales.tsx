@@ -19,6 +19,7 @@ type SaleRow = {
   invoice_file_path?: string | null;
   finance_dp_amount?: number | null;
   installment_count?: number | null;
+  dp_payment_mode?: string | null;
 };
 
 type SaleItemRow = {
@@ -346,7 +347,7 @@ export default function Sales() {
                   <div>{sale.payment_mode || "-"}</div>
                   {sale.payment_mode === "finance_card" && (
                     <div className="text-xs text-gray-500">
-                      DP: {formatCurrency(Number(sale.finance_dp_amount || 0))} | EMI: {Number(sale.installment_count || 0)}
+                      DP ({sale.dp_payment_mode === "online" ? "Online" : "Cash"}): {formatCurrency(Number(sale.finance_dp_amount || 0))} | EMI: {Number(sale.installment_count || 0)}
                     </div>
                   )}
                   <div className="text-xs text-gray-500">

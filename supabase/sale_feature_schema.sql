@@ -40,7 +40,8 @@ alter table public.sales
   add column if not exists invoice_pdf_url text,
   add column if not exists invoice_file_path text,
   add column if not exists finance_dp_amount numeric(12,2) default 0,
-  add column if not exists installment_count integer default 0;
+  add column if not exists installment_count integer default 0,
+  add column if not exists dp_payment_mode text;
 
 alter table public.sales_items
   add column if not exists item_type text default 'laptop',
@@ -48,7 +49,8 @@ alter table public.sales_items
   add column if not exists quantity integer default 1,
   add column if not exists unit_price numeric(12,2) default 0,
   add column if not exists line_total numeric(12,2) default 0,
-  add column if not exists is_complimentary boolean default false;
+  add column if not exists is_complimentary boolean default false,
+  add column if not exists graphic_card text;
 
 alter table public.transfers
   add column if not exists sale_invoice_id bigint null references public.sales(id) on delete set null;
