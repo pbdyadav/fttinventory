@@ -51,7 +51,7 @@ const COMPANY = {
   addressLine2: "8 A RNT MARG, INDORE - 452001",
   gst: "GSTIN/UIN: 23AACCF9503E1Z1",
   state: "Madhya Pradesh (23)",
-  phone: "Mob.: 9713036633",
+  phone: "Mob.: 9893532947",
   email: "Email: fttpvtltd@gmail.com",
 };
 
@@ -563,7 +563,7 @@ export default function CreateInvoice() {
     doc.setFontSize(10.5);
     doc.text("SALE INVOICE", right - 67, y + 21, { align: "center" });
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.text(`Invoice No: ${invoiceNo}`, right - 120, y + 40);
     doc.text(`Invoice Date: ${formatDate(invoiceDate)}`, right - 120, y + 54);
     const paymentText = `Payment: ${getInvoiceBoxPaymentLabel(
@@ -668,7 +668,7 @@ export default function CreateInvoice() {
     });
 
     const terms = [
-      "1. One month piece-to-piece replacement guarantee (excluding physical, liquid, or burn damage).",
+      "1. One month guarantee and Two month warranty (excluding physical, liquid, or burn damage).",
       "2. One year free service from invoice date. Spare parts, if needed, are chargeable.",
       "3. Complimentary gift items, if any, are non-returnable and only for this invoice.",
       "4. Goods once sold will be serviced as per warranty terms mentioned above.",
