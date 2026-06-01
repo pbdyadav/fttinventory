@@ -25,6 +25,7 @@ export default function Navbar() {
         <Link to="/laptop-test" className="hover:text-gray-400">Laptop Test</Link>
         <Link to="/laptop-inventory" className="hover:text-gray-400">Laptop Inventory</Link>
         <Link to="/sales" className="hover:text-gray-400">Sales</Link>
+        <Link to="/sales-ledger" className="hover:text-gray-400">Sales Ledger</Link>
         <Link to="/reports" className="hover:text-gray-400">Reports</Link>
 
         <span className="text-gray-300 text-sm">

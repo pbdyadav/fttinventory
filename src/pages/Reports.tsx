@@ -7,6 +7,15 @@ import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import FTTLogo from "@/assets/logo.png";
 import { useNavigate } from "react-router-dom";
+import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+
+const LOCATION_OPTIONS = [
+  { label: "Main Warehouse", value: "Main Warehouse" },
+  { label: "FTT Retail", value: "FTT Retail" },
+  { label: "Sold", value: "Sold" },
+  { label: "Godown Sale", value: "Godown Sale" },
+  { label: "Purchase Return to Dealer", value: "Purchase Return to Dealer" },
+];
 
 export default function Reports() {
   const [reports, setReports] = useState<any[]>([]);
@@ -14,7 +23,14 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [salesMap, setSalesMap] = useState<Record<string, any>>({});
+  const [locationMap, setLocationMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState(""); // <-- ADDED: Search state
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [filters, setFilters] = useState({
+    fromDate: "",
+    toDate: "",
+    currentLocation: "",
+  });
   const [user, setUser] = useState<any>(() => {
     const cached = localStorage.getItem("user");
     return cached ? JSON.parse(cached) : null;
@@ -101,9 +117,13 @@ useEffect(() => {
         const { data: reportData } = await query;
         setReports(reportData || []);
 
-        const [{ data: salesData }, { data: salesItemsData }] = await Promise.all([
+        const [{ data: salesData }, { data: salesItemsData }, { data: transfersData }] = await Promise.all([
           supabase.from("sales").select("*"),
           supabase.from("sales_items").select("*"),
+          supabase
+            .from("transfers")
+            .select("laptop_id, to_location, transfer_date, created_at")
+            .order("transfer_date", { ascending: false }),
         ]);
 
         const saleByLaptop: Record<string, any> = {};
@@ -145,6 +165,15 @@ useEffect(() => {
           };
         });
         setSalesMap(mergedSalesMap);
+
+        const latestLocations: Record<string, string> = {};
+        (transfersData || []).forEach((transfer: any) => {
+          const laptopId = String(transfer.laptop_id);
+          if (!latestLocations[laptopId]) {
+            latestLocations[laptopId] = transfer.to_location || "Main Warehouse";
+          }
+        });
+        setLocationMap(latestLocations);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load reports");
@@ -162,14 +191,34 @@ useEffect(() => {
 
   // ✅ Filtering logic using the search state
   const lowerSearch = search.toLowerCase();
-  const filteredReports = reports.filter((item) =>
-    item.MashinCode?.toString().toLowerCase().includes(lowerSearch) ||
-    item.SerialNo?.toLowerCase().includes(lowerSearch) ||
-    item.tested_by?.toLowerCase().includes(lowerSearch) ||
-    item.Model?.toLowerCase().includes(lowerSearch) ||
-    item.Gen?.toLowerCase().includes(lowerSearch) ||
-    item.GraphicCard?.toLowerCase().includes(lowerSearch)
-  );
+  const filteredReports = reports.filter((item) => {
+    const matchesSearch =
+      item.MashinCode?.toString().toLowerCase().includes(lowerSearch) ||
+      item.SerialNo?.toLowerCase().includes(lowerSearch) ||
+      item.tested_by?.toLowerCase().includes(lowerSearch) ||
+      item.Model?.toLowerCase().includes(lowerSearch) ||
+      item.Gen?.toLowerCase().includes(lowerSearch) ||
+      item.GraphicCard?.toLowerCase().includes(lowerSearch);
+
+    if (!matchesSearch) return false;
+
+    const testedDate = item.tested_on || item.created_at;
+    const itemDate = testedDate ? new Date(testedDate) : null;
+    const fromDate = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00`) : null;
+    const toDate = filters.toDate ? new Date(`${filters.toDate}T23:59:59`) : null;
+    const currentLocation =
+      item.status === "sold" ? "Sold" : locationMap[String(item.id)] || "Main Warehouse";
+
+    if (fromDate && (!itemDate || itemDate < fromDate)) return false;
+    if (toDate && (!itemDate || itemDate > toDate)) return false;
+    if (filters.currentLocation && currentLocation !== filters.currentLocation) return false;
+
+    return true;
+  });
+
+  const clearAdvancedFilters = () => {
+    setFilters({ fromDate: "", toDate: "", currentLocation: "" });
+  };
 
   // ✅ Toggle selection for checkboxes
   const toggleSelect = (id: string) => {
@@ -464,13 +513,38 @@ useEffect(() => {
       </div>
 
       {/* 🔍 ADDED: Search Input */}
-      <input
-        type="text"
-        placeholder="Search by M. Code, Serial No, Model, Graphic Card, Gen..."
-        className="border p-2 rounded w-full mb-3 focus:ring-blue-500 focus:border-blue-500"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="mb-3 flex flex-col gap-2 md:flex-row">
+        <input
+          type="text"
+          placeholder="Search by M. Code, Serial No, Model, Graphic Card, Gen..."
+          className="w-full rounded border p-2 focus:border-blue-500 focus:ring-blue-500"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShowAdvancedFilter(true)}
+          className="whitespace-nowrap rounded bg-slate-800 px-4 py-2 text-white hover:bg-slate-900"
+        >
+          Advanced Filter
+        </button>
+      </div>
+      {showAdvancedFilter && (
+        <AdvancedFilterPanel
+          title="Reports Advanced Filter"
+          fromDate={filters.fromDate}
+          toDate={filters.toDate}
+          selectLabel="Current Location"
+          selectValue={filters.currentLocation}
+          selectOptions={LOCATION_OPTIONS}
+          onFromDateChange={(value) => setFilters((current) => ({ ...current, fromDate: value }))}
+          onToDateChange={(value) => setFilters((current) => ({ ...current, toDate: value }))}
+          onSelectChange={(value) => setFilters((current) => ({ ...current, currentLocation: value }))}
+          onApply={() => setShowAdvancedFilter(false)}
+          onClear={clearAdvancedFilters}
+          onClose={() => setShowAdvancedFilter(false)}
+        />
+      )}
       {/* 🔍 END Search Input */}
 
       <div className="overflow-x-auto bg-white rounded-xl shadow border">

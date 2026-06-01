@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import EditReport from "@/pages/EditReport";
 import CreateInvoice from "@/pages/CreateInvoice";
 import Sales from "@/pages/Sales";
+import SalesLedger from "@/pages/SalesLedger";
 import Navbar from "@/components/Navbar";
 import AutoLogout from "@/components/AutoLogout";
 
@@ -154,6 +155,15 @@ export default function App() {
             element={
               <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
                 <Sales />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/sales-ledger"
+            element={
+              <PrivateRoute isLoggedIn={isLoggedIn} loading={loading}>
+                <SalesLedger />
               </PrivateRoute>
             }
           />

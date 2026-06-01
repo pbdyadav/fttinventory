@@ -2,6 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+
+const PAYMENT_MODE_OPTIONS = [
+  { label: "Cash", value: "cash" },
+  { label: "Online", value: "online" },
+  { label: "Bajaj", value: "bajaj" },
+  { label: "Credit Card", value: "credit_card" },
+  { label: "On Credit", value: "on_credit" },
+  { label: "Parcel Payment", value: "parcel_payment" },
+];
 
 type SaleRow = {
   id: number;
@@ -65,6 +75,12 @@ export default function Sales() {
   const [loading, setLoading] = useState(true);
   const [busySaleId, setBusySaleId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [filters, setFilters] = useState({
+    fromDate: "",
+    toDate: "",
+    paymentMode: "",
+  });
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [saleItems, setSaleItems] = useState<SaleItemRow[]>([]);
 
@@ -107,8 +123,6 @@ export default function Sales() {
 
   const filteredSales = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return groupedSales;
-
     return groupedSales.filter((sale) => {
       const saleText = [
         sale.invoice_no,
@@ -125,9 +139,34 @@ export default function Sales() {
         .join(" ")
         .toLowerCase();
 
-      return saleText.includes(term);
+      if (term && !saleText.includes(term)) return false;
+
+      const saleDate = sale.invoice_date ? new Date(`${sale.invoice_date}T00:00:00`) : null;
+      const fromDate = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00`) : null;
+      const toDate = filters.toDate ? new Date(`${filters.toDate}T23:59:59`) : null;
+      const paymentMode = (sale.payment_mode || "").toLowerCase();
+
+      if (fromDate && (!saleDate || saleDate < fromDate)) return false;
+      if (toDate && (!saleDate || saleDate > toDate)) return false;
+      if (filters.paymentMode) {
+        if (filters.paymentMode === "bajaj" && paymentMode !== "finance_card") return false;
+        if (filters.paymentMode === "credit_card" && paymentMode !== "finance_card") return false;
+        if (
+          filters.paymentMode !== "bajaj" &&
+          filters.paymentMode !== "credit_card" &&
+          paymentMode !== filters.paymentMode
+        ) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [groupedSales, search]);
+  }, [groupedSales, search, filters]);
+
+  const clearAdvancedFilters = () => {
+    setFilters({ fromDate: "", toDate: "", paymentMode: "" });
+  };
 
   const openInvoice = async (sale: SaleRow) => {
     const fallbackPath = sale.invoice_file_path || `invoices/${sale.invoice_no}.pdf`;
@@ -270,13 +309,39 @@ export default function Sales() {
         </div>
       </div>
 
-      <input
-        type="text"
-        className="border p-2.5 rounded-lg w-full mb-4 bg-white"
-        placeholder="Search by invoice no, customer, machine code, serial no or gift..."
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <div className="mb-4 flex flex-col gap-2 md:flex-row">
+        <input
+          type="text"
+          className="w-full rounded-lg border bg-white p-2.5"
+          placeholder="Search by invoice no, customer, machine code, serial no or gift..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShowAdvancedFilter(true)}
+          className="whitespace-nowrap rounded-lg bg-slate-800 px-4 py-2.5 text-white hover:bg-slate-900"
+        >
+          Advanced Filter
+        </button>
+      </div>
+
+      {showAdvancedFilter && (
+        <AdvancedFilterPanel
+          title="Sales Advanced Filter"
+          fromDate={filters.fromDate}
+          toDate={filters.toDate}
+          selectLabel="Payment Mode"
+          selectValue={filters.paymentMode}
+          selectOptions={PAYMENT_MODE_OPTIONS}
+          onFromDateChange={(value) => setFilters((current) => ({ ...current, fromDate: value }))}
+          onToDateChange={(value) => setFilters((current) => ({ ...current, toDate: value }))}
+          onSelectChange={(value) => setFilters((current) => ({ ...current, paymentMode: value }))}
+          onApply={() => setShowAdvancedFilter(false)}
+          onClear={clearAdvancedFilters}
+          onClose={() => setShowAdvancedFilter(false)}
+        />
+      )}
 
       <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm text-gray-800">

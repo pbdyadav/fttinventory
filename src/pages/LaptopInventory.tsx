@@ -3,11 +3,26 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+
+const LOCATION_OPTIONS = [
+  { label: "Main Warehouse", value: "Main Warehouse" },
+  { label: "FTT Retail", value: "FTT Retail" },
+  { label: "Sold", value: "Sold" },
+  { label: "Godown Sale", value: "Godown Sale" },
+  { label: "Purchase Return to Dealer", value: "Purchase Return to Dealer" },
+];
 
 export default function LaptopInventory() {
   const [laptops, setLaptops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");   // ✅ NEW
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [filters, setFilters] = useState({
+    fromDate: "",
+    toDate: "",
+    currentLocation: "",
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,7 +64,7 @@ export default function LaptopInventory() {
       })
     );
 
-    setLaptops(enriched.filter((lap) => lap.status !== "sold"));
+    setLaptops(enriched);
     setLoading(false);
   };
 
@@ -143,26 +158,71 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
   if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
 
   // ✅ FILTERED LIST (New)
-  const filteredLaptops = laptops.filter((item) =>
-    item.MashinCode?.toString().includes(search.toLowerCase()) ||
-    item.SerialNo?.toLowerCase().includes(search.toLowerCase()) ||
-    item.Model?.toLowerCase().includes(search.toLowerCase()) ||
-    item.Gen?.toLowerCase().includes(search.toLowerCase()) ||
-    item.GraphicCard?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredLaptops = laptops
+    .filter((item) =>
+      item.MashinCode?.toString().includes(search.toLowerCase()) ||
+      item.SerialNo?.toLowerCase().includes(search.toLowerCase()) ||
+      item.Model?.toLowerCase().includes(search.toLowerCase()) ||
+      item.Gen?.toLowerCase().includes(search.toLowerCase()) ||
+      item.GraphicCard?.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((item) => {
+      const itemDate = item.created_at ? new Date(item.created_at) : null;
+      const fromDate = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00`) : null;
+      const toDate = filters.toDate ? new Date(`${filters.toDate}T23:59:59`) : null;
+      const currentLocation =
+        item.status === "sold" ? "Sold" : item.current_location || "Main Warehouse";
+
+      if (!filters.currentLocation && item.status === "sold") return false;
+      if (fromDate && (!itemDate || itemDate < fromDate)) return false;
+      if (toDate && (!itemDate || itemDate > toDate)) return false;
+      if (filters.currentLocation && currentLocation !== filters.currentLocation) return false;
+
+      return true;
+    });
+
+  const clearAdvancedFilters = () => {
+    setFilters({ fromDate: "", toDate: "", currentLocation: "" });
+  };
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-4">💻 Laptop Inventory</h1>
 
       {/* ✅ SEARCH BAR */}
-      <input
-        type="text"
-        placeholder="Search: M. Code, Serial No, Model, Graphic Card, Gen..."
-        className="border p-2 rounded w-full mb-4"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="mb-4 flex flex-col gap-2 md:flex-row">
+        <input
+          type="text"
+          placeholder="Search: M. Code, Serial No, Model, Graphic Card, Gen..."
+          className="w-full rounded border p-2"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShowAdvancedFilter(true)}
+          className="whitespace-nowrap rounded bg-slate-800 px-4 py-2 text-white hover:bg-slate-900"
+        >
+          Advanced Filter
+        </button>
+      </div>
+
+      {showAdvancedFilter && (
+        <AdvancedFilterPanel
+          title="Inventory Advanced Filter"
+          fromDate={filters.fromDate}
+          toDate={filters.toDate}
+          selectLabel="Current Location"
+          selectValue={filters.currentLocation}
+          selectOptions={LOCATION_OPTIONS}
+          onFromDateChange={(value) => setFilters((current) => ({ ...current, fromDate: value }))}
+          onToDateChange={(value) => setFilters((current) => ({ ...current, toDate: value }))}
+          onSelectChange={(value) => setFilters((current) => ({ ...current, currentLocation: value }))}
+          onApply={() => setShowAdvancedFilter(false)}
+          onClear={clearAdvancedFilters}
+          onClose={() => setShowAdvancedFilter(false)}
+        />
+      )}
 
       <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border border-gray-200">
         <table className="min-w-full text-sm text-gray-800">
