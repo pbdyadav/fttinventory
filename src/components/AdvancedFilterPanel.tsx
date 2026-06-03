@@ -10,9 +10,13 @@ type AdvancedFilterPanelProps = {
   selectLabel: string;
   selectValue: string;
   selectOptions: FilterOption[];
+  secondSelectLabel?: string;
+  secondSelectValue?: string;
+  secondSelectOptions?: FilterOption[];
   onFromDateChange: (value: string) => void;
   onToDateChange: (value: string) => void;
   onSelectChange: (value: string) => void;
+  onSecondSelectChange?: (value: string) => void;
   onApply: () => void;
   onClear: () => void;
   onClose: () => void;
@@ -25,9 +29,13 @@ export default function AdvancedFilterPanel({
   selectLabel,
   selectValue,
   selectOptions,
+  secondSelectLabel,
+  secondSelectValue = "",
+  secondSelectOptions = [],
   onFromDateChange,
   onToDateChange,
   onSelectChange,
+  onSecondSelectChange,
   onApply,
   onClear,
   onClose,
@@ -76,7 +84,7 @@ export default function AdvancedFilterPanel({
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className={secondSelectLabel ? "" : "md:col-span-2"}>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               {selectLabel}
             </label>
@@ -93,6 +101,26 @@ export default function AdvancedFilterPanel({
               ))}
             </select>
           </div>
+
+          {secondSelectLabel && onSecondSelectChange ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                {secondSelectLabel}
+              </label>
+              <select
+                className="w-full rounded border p-2"
+                value={secondSelectValue}
+                onChange={(event) => onSecondSelectChange(event.target.value)}
+              >
+                <option value="">All</option>
+                {secondSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

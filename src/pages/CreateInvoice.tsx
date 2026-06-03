@@ -5,6 +5,17 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import CompanyLogo from "@/assets/logo.png";
+import FinanceDpDetails from "@/components/FinanceDpDetails";
+import { SALES_TEAM, formatSalesmanName } from "@/lib/salesTeam";
+import {
+  buildFinanceDpSaveFields,
+  financeDpSourceFromForm,
+  getFinanceDpBreakdown,
+  getFinancePaymentDisplay,
+  isMissingExtendedSalesColumnError,
+  stripExtendedSalesFields,
+  type FinanceDpMode,
+} from "@/lib/financeDp";
 
 type CustomerDetails = {
   name: string;
@@ -151,12 +162,16 @@ const getPaymentLabel = (mode: PaymentMode) => {
   return "On Credit";
 };
 
-const getDpPaymentLabel = (mode: "cash" | "online") =>
-  mode === "online" ? "Online" : "Cash";
+const getDpPaymentLabel = (mode: FinanceDpMode) =>
+  mode === "partial_cash_online"
+    ? "Cash + Online"
+    : mode === "online"
+      ? "Online"
+      : "Cash";
 
 const getInvoiceBoxPaymentLabel = (
   mode: PaymentMode,
-  dpPaymentMode: "cash" | "online"
+  dpPaymentMode: FinanceDpMode
 ) => {
   if (mode === "finance_card") {
     return `Bajaj Finance / Card (${getDpPaymentLabel(dpPaymentMode)} DP)`;
@@ -164,6 +179,15 @@ const getInvoiceBoxPaymentLabel = (
 
   return getPaymentLabel(mode);
 };
+
+const getReadableCurrency = (value: number) =>
+  `Rs. ${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const getDpPaymentLabelLegacy = (mode: "cash" | "online") =>
+  mode === "online" ? "Online" : "Cash";
 
 const normalizePositiveNumber = (value: string | number) => {
   const parsed = Number(value);
@@ -234,8 +258,12 @@ export default function CreateInvoice() {
   const [cashAmount, setCashAmount] = useState(0);
   const [onlineAmount, setOnlineAmount] = useState(0);
   const [financeDpAmount, setFinanceDpAmount] = useState(0);
+  const [partialDpCashAmount, setPartialDpCashAmount] = useState(0);
+  const [partialDpOnlineAmount, setPartialDpOnlineAmount] = useState(0);
   const [installmentCount, setInstallmentCount] = useState(0);
-  const [dpPaymentMode, setDpPaymentMode] = useState<"cash" | "online">("cash");
+  const [dpPaymentMode, setDpPaymentMode] = useState<FinanceDpMode>("cash");
+  const [paymentNarration, setPaymentNarration] = useState("");
+  const [salesmanName, setSalesmanName] = useState("");
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + getLineTotal(item), 0),
@@ -243,6 +271,40 @@ export default function CreateInvoice() {
   );
 
   const total = subtotal;
+
+  const financeDpSource = useMemo(
+    () =>
+      financeDpSourceFromForm({
+        paymentMode,
+        total,
+        dpPaymentMode,
+        financeDpAmount,
+        partialDpCashAmount,
+        partialDpOnlineAmount,
+        installmentCount,
+        paymentNarration,
+      }),
+    [
+      paymentMode,
+      total,
+      dpPaymentMode,
+      financeDpAmount,
+      partialDpCashAmount,
+      partialDpOnlineAmount,
+      installmentCount,
+      paymentNarration,
+    ]
+  );
+
+  const financeDpBreakdown = useMemo(
+    () => getFinanceDpBreakdown(financeDpSource),
+    [financeDpSource]
+  );
+
+  const financeDpTotal =
+    dpPaymentMode === "partial_cash_online"
+      ? partialDpCashAmount + partialDpOnlineAmount
+      : financeDpAmount;
 
   useEffect(() => {
     if (paymentMode === "cash") {
@@ -258,10 +320,10 @@ export default function CreateInvoice() {
     }
 
     if (paymentMode === "finance_card") {
-      setCashAmount(dpPaymentMode === "cash" ? financeDpAmount : 0);
-      setOnlineAmount(dpPaymentMode === "online" ? financeDpAmount : 0);
+      setCashAmount(financeDpBreakdown.cashAmount);
+      setOnlineAmount(financeDpBreakdown.onlineAmount);
     }
-  }, [paymentMode, total, financeDpAmount, dpPaymentMode]);
+  }, [paymentMode, financeDpBreakdown]);
 
   const generateInvoiceNo = async (): Promise<string> => {
     try {
@@ -378,11 +440,20 @@ export default function CreateInvoice() {
         setPaymentMode(editPaymentMode);
         setCashAmount(Number(saleData.cash_amount || 0));
         setOnlineAmount(Number(saleData.online_amount || 0));
+        const loadedBreakdown = getFinanceDpBreakdown({
+          payment_mode: editPaymentMode,
+          finance_dp_amount: saleData.finance_dp_amount,
+          dp_payment_mode: saleData.dp_payment_mode,
+          partial_dp_cash_amount: saleData.partial_dp_cash_amount,
+          partial_dp_online_amount: saleData.partial_dp_online_amount,
+        });
+        setDpPaymentMode(loadedBreakdown.mode);
         setFinanceDpAmount(Number(saleData.finance_dp_amount || 0));
+        setPartialDpCashAmount(loadedBreakdown.cashAmount);
+        setPartialDpOnlineAmount(loadedBreakdown.onlineAmount);
         setInstallmentCount(Number(saleData.installment_count || 0));
-        setDpPaymentMode(
-          saleData.dp_payment_mode === "online" ? "online" : "cash"
-        );
+        setPaymentNarration(saleData.payment_narration || "");
+        setSalesmanName(saleData.salesman_name || "");
 
         const hydratedItems =
           (saleItemsData || []).map((item: any) => ({
@@ -556,32 +627,103 @@ export default function CreateInvoice() {
     doc.text(`${COMPANY.state}   ${COMPANY.phone}`, companyNameX, companyInfoTop + 36);
     doc.text(COMPANY.email, companyNameX, companyInfoTop + 48);
 
-    doc.setDrawColor(30, 41, 59);
-    doc.setLineWidth(1.1);
-    doc.roundedRect(right - 150, y + 2, 150, 82, 8, 8);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.text("SALE INVOICE", right - 67, y + 21, { align: "center" });
+    const financeDisplay = getFinancePaymentDisplay(financeDpSource);
+    const paymentText = financeDisplay
+      ? `Payment: ${financeDisplay.paymentModeLabel}`
+      : `Payment: ${getPaymentLabel(paymentMode)}`;
+
+    const invoiceBoxWidth = 200;
+    const invoiceBoxX = right - invoiceBoxWidth;
+    const invoiceBoxTop = y + 2;
+    const invoiceTextX = invoiceBoxX + 12;
+    const invoiceTextMaxWidth = invoiceBoxWidth - 24;
+    const invoiceLineHeight =
+      (doc.getFontSize() * doc.getLineHeightFactor() * 1.08) / doc.internal.scaleFactor;
+    const invoiceFieldGap = 4;
+    const invoiceBoxPaddingTop = 12;
+    const invoiceBoxPaddingBottom = 12;
+    const invoiceTitleHeight = 18;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`Invoice No: ${invoiceNo}`, right - 120, y + 40);
-    doc.text(`Invoice Date: ${formatDate(invoiceDate)}`, right - 120, y + 54);
-    const paymentText = `Payment: ${getInvoiceBoxPaymentLabel(
-      paymentMode,
-      dpPaymentMode
-    )}`;
 
-    const wrappedPayment = doc.splitTextToSize(paymentText, 110);
+    const invoiceFieldBlocks = [
+      doc.splitTextToSize(`Invoice No: ${invoiceNo}`, invoiceTextMaxWidth),
+      doc.splitTextToSize(`Invoice Date: ${formatDate(invoiceDate)}`, invoiceTextMaxWidth),
+      doc.splitTextToSize(paymentText, invoiceTextMaxWidth),
+      doc.splitTextToSize(
+        `Salesman: ${formatSalesmanName(salesmanName)}`,
+        invoiceTextMaxWidth
+      ),
+    ];
 
-    doc.text(wrappedPayment, right - 120, y + 66);
+    const invoiceFieldsHeight = invoiceFieldBlocks.reduce(
+      (sum, block) => sum + block.length * invoiceLineHeight + invoiceFieldGap,
+      -invoiceFieldGap
+    );
+    const invoiceBoxHeight =
+      invoiceBoxPaddingTop +
+      invoiceTitleHeight +
+      invoiceFieldsHeight +
+      invoiceBoxPaddingBottom;
 
-    y += 100;
+    doc.setDrawColor(30, 41, 59);
+    doc.setLineWidth(1.1);
+    doc.roundedRect(
+      invoiceBoxX,
+      invoiceBoxTop,
+      invoiceBoxWidth,
+      invoiceBoxHeight,
+      8,
+      8
+    );
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text(
+      "SALE INVOICE",
+      invoiceBoxX + invoiceBoxWidth / 2,
+      invoiceBoxTop + invoiceBoxPaddingTop + 6,
+      { align: "center" }
+    );
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    let invoiceFieldY =
+      invoiceBoxTop + invoiceBoxPaddingTop + invoiceTitleHeight + 6;
+
+    invoiceFieldBlocks.forEach((block) => {
+      block.forEach((line) => {
+        doc.text(line, invoiceTextX, invoiceFieldY);
+        invoiceFieldY += invoiceLineHeight;
+      });
+      invoiceFieldY += invoiceFieldGap;
+    });
+
+    const companyBlockBottom = companyInfoTop + 48 + 10;
+    y = Math.max(invoiceBoxTop + invoiceBoxHeight, companyBlockBottom) + 16;
 
     const addressLines = doc.splitTextToSize(
       `Address: ${customerData.address || "-"}`,
       320
     );
-    const paymentSummaryHeight = paymentMode === "finance_card" ? 118 : 88;
+    const financePdfLines =
+      paymentMode === "finance_card" && financeDisplay
+        ? financeDisplay.isPartialBreakup
+          ? 5 +
+            (financeDisplay.narration
+              ? doc.splitTextToSize(`Narration: ${financeDisplay.narration}`, 170)
+                  .length
+              : 0)
+          : 3 +
+            (financeDisplay.narration
+              ? doc.splitTextToSize(`Narration: ${financeDisplay.narration}`, 170)
+                  .length
+              : 0)
+        : 0;
+    const paymentSummaryHeight =
+      paymentMode === "finance_card" ? 70 + financePdfLines * 14 : 88;
     const customerBoxHeight = Math.max(
       paymentSummaryHeight,
       32 + addressLines.length * 12 + 20
@@ -604,18 +746,60 @@ export default function CreateInvoice() {
     doc.setFont("helvetica", "bold");
     doc.text("Payment Summary", paymentBoxX, y + 18);
     doc.setFont("helvetica", "normal");
-    doc.text(`Cash: ${formatCurrency(cashAmount)}`, paymentBoxX, y + 38);
-    doc.text(`Online: ${formatCurrency(onlineAmount)}`, paymentBoxX, y + 54);
-    if (paymentMode === "finance_card") {
+    let paymentLineY = y + 38;
+    if (paymentMode === "finance_card" && financeDisplay) {
+      if (financeDisplay.isPartialBreakup) {
+        doc.text("DP Details:", paymentBoxX, paymentLineY);
+        paymentLineY += 14;
+        doc.text(
+          `Cash: ${formatCurrency(financeDisplay.cashAmount)}`,
+          paymentBoxX,
+          paymentLineY
+        );
+        paymentLineY += 14;
+        doc.text(
+          `Online: ${formatCurrency(financeDisplay.onlineAmount)}`,
+          paymentBoxX,
+          paymentLineY
+        );
+        paymentLineY += 14;
+        doc.text(
+          `Total DP: ${formatCurrency(financeDisplay.totalDp)}`,
+          paymentBoxX,
+          paymentLineY
+        );
+        paymentLineY += 14;
+      } else {
+        doc.text(
+          `DP (${financeDisplay.legacyDpLabel}): ${formatCurrency(financeDisplay.totalDp)}`,
+          paymentBoxX,
+          paymentLineY
+        );
+        paymentLineY += 14;
+      }
       doc.text(
-        `DP (${getDpPaymentLabel(dpPaymentMode)}): ${formatCurrency(financeDpAmount)}`,
+        `Financed Amount: ${formatCurrency(financeDisplay.financedAmount)}`,
         paymentBoxX,
-        y + 70
+        paymentLineY
       );
-      doc.text(`EMI Count: ${installmentCount || 0}`, paymentBoxX, y + 86);
-      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 102);
+      paymentLineY += 14;
+      doc.text(`EMI Count: ${installmentCount || 0}`, paymentBoxX, paymentLineY);
+      paymentLineY += 14;
+      if (financeDisplay.narration) {
+        const narrationLines = doc.splitTextToSize(
+          `Narration: ${financeDisplay.narration}`,
+          170
+        );
+        doc.text(narrationLines, paymentBoxX, paymentLineY);
+        paymentLineY += narrationLines.length * 12;
+      }
+      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, paymentLineY);
     } else {
-      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, y + 70);
+      doc.text(`Cash: ${formatCurrency(cashAmount)}`, paymentBoxX, paymentLineY);
+      paymentLineY += 16;
+      doc.text(`Online: ${formatCurrency(onlineAmount)}`, paymentBoxX, paymentLineY);
+      paymentLineY += 16;
+      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, paymentLineY);
     }
 
     y += customerBoxHeight + 18;
@@ -893,6 +1077,11 @@ export default function CreateInvoice() {
       return;
     }
 
+    if (!salesmanName) {
+      toast.error("Salesman select karna zaroori hai.");
+      return;
+    }
+
     if (!items.length) {
       toast.error("Kam se kam ek item add kijiye.");
       return;
@@ -928,13 +1117,19 @@ export default function CreateInvoice() {
     }
 
     if (paymentMode === "finance_card") {
-      if (financeDpAmount <= 0) {
+      if (financeDpTotal <= 0) {
         toast.error("DP amount required hai.");
         return;
       }
-      if (financeDpAmount > total) {
+      if (financeDpTotal > total) {
         toast.error("DP amount total se zyada nahi ho sakta.");
         return;
+      }
+      if (dpPaymentMode === "partial_cash_online") {
+        if (partialDpCashAmount < 0 || partialDpOnlineAmount < 0) {
+          toast.error("Cash DP aur Online DP negative nahi ho sakte.");
+          return;
+        }
       }
       if (installmentCount <= 0) {
         toast.error("Installment count required hai.");
@@ -947,6 +1142,24 @@ export default function CreateInvoice() {
     setInvoiceNoPreview(invoiceNo);
 
     try {
+      const financeFields =
+        paymentMode === "finance_card"
+          ? buildFinanceDpSaveFields({
+              dpPaymentMode,
+              financeDpAmount,
+              partialDpCashAmount,
+              partialDpOnlineAmount,
+              paymentNarration,
+            })
+          : {
+              finance_dp_amount: 0,
+              installment_count: 0,
+              dp_payment_mode: null,
+              partial_dp_cash_amount: null,
+              partial_dp_online_amount: null,
+              payment_narration: null,
+            };
+
       const salePayload = {
         invoice_no: invoiceNo,
         invoice_date: invoiceDate,
@@ -968,16 +1181,37 @@ export default function CreateInvoice() {
             : paymentMode === "partial"
               ? Number(onlineAmount || 0)
               : 0,
-        finance_dp_amount: paymentMode === "finance_card" ? Number(financeDpAmount || 0) : 0,
+        finance_dp_amount: financeFields.finance_dp_amount,
         installment_count: paymentMode === "finance_card" ? Number(installmentCount || 0) : 0,
-        dp_payment_mode: paymentMode === "finance_card" ? dpPaymentMode : null,
+        dp_payment_mode: financeFields.dp_payment_mode,
+        partial_dp_cash_amount: financeFields.partial_dp_cash_amount,
+        partial_dp_online_amount: financeFields.partial_dp_online_amount,
+        payment_narration: financeFields.payment_narration,
+        salesman_name: salesmanName,
       };
 
-      const saleMutation = isEditMode
-        ? supabase.from("sales").update(salePayload).eq("id", Number(saleId)).select().single()
-        : supabase.from("sales").insert(salePayload).select().single();
+      const runSaleMutation = (payload: typeof salePayload) =>
+        isEditMode
+          ? supabase.from("sales").update(payload).eq("id", Number(saleId)).select().single()
+          : supabase.from("sales").insert(payload).select().single();
 
-      const { data: saleRow, error: saleError } = await saleMutation;
+      let saleRow: { id: number } | null = null;
+      let saleError: { message?: string } | null = null;
+
+      ({ data: saleRow, error: saleError } = await runSaleMutation(salePayload));
+
+      if (
+        saleError?.message &&
+        isMissingExtendedSalesColumnError(saleError.message)
+      ) {
+        console.warn(
+          "Extended sales columns not found; saving without partial DP / narration fields.",
+          saleError.message
+        );
+        ({ data: saleRow, error: saleError } = await runSaleMutation(
+          stripExtendedSalesFields(salePayload) as typeof salePayload
+        ));
+      }
 
       if (saleError || !saleRow) {
         throw new Error(saleError?.message || "Sale record create nahi hua.");
@@ -1148,7 +1382,7 @@ export default function CreateInvoice() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Invoice No
@@ -1186,6 +1420,25 @@ export default function CreateInvoice() {
               <option value="partial">Partial (Cash + Online)</option>
               <option value="finance_card">Bajaj Finance / Credit Card</option>
               <option value="on_credit">On Credit</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Salesman
+            </label>
+            <select
+              value={salesmanName}
+              onChange={(event) => setSalesmanName(event.target.value)}
+              className="border p-2.5 w-full rounded-lg"
+              required
+            >
+              <option value="">Select Salesman</option>
+              {SALES_TEAM.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1274,27 +1527,62 @@ export default function CreateInvoice() {
                   <select
                     value={dpPaymentMode}
                     onChange={(event) =>
-                      setDpPaymentMode(event.target.value as "cash" | "online")
+                      setDpPaymentMode(event.target.value as FinanceDpMode)
                     }
-                    className="border p-2.5 rounded-lg"
+                    className="border p-2.5 rounded-lg md:col-span-2"
                   >
                     <option value="cash">DP Received in Cash</option>
                     <option value="online">DP Received Online</option>
+                    <option value="partial_cash_online">
+                      DP Received Partially (Cash + Online)
+                    </option>
                   </select>
-                  <input
-                    type="number"
-                    min="0"
-                    className="border p-2.5 rounded-lg"
-                    placeholder="DP Amount"
-                    value={String(financeDpAmount || "")}
-                    onChange={(event) =>
-                      setFinanceDpAmount(normalizePositiveNumber(event.target.value))
-                    }
-                  />
+                  {dpPaymentMode === "partial_cash_online" ? (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        className="border p-2.5 rounded-lg"
+                        placeholder="Cash DP Amount"
+                        value={String(partialDpCashAmount || "")}
+                        onChange={(event) =>
+                          setPartialDpCashAmount(
+                            normalizePositiveNumber(event.target.value)
+                          )
+                        }
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        className="border p-2.5 rounded-lg"
+                        placeholder="Online DP Amount"
+                        value={String(partialDpOnlineAmount || "")}
+                        onChange={(event) =>
+                          setPartialDpOnlineAmount(
+                            normalizePositiveNumber(event.target.value)
+                          )
+                        }
+                      />
+                      <p className="md:col-span-2 text-xs font-medium text-gray-700">
+                        Total DP: {formatCurrency(financeDpTotal)}
+                      </p>
+                    </>
+                  ) : (
+                    <input
+                      type="number"
+                      min="0"
+                      className="border p-2.5 rounded-lg md:col-span-2"
+                      placeholder="DP Amount"
+                      value={String(financeDpAmount || "")}
+                      onChange={(event) =>
+                        setFinanceDpAmount(normalizePositiveNumber(event.target.value))
+                      }
+                    />
+                  )}
                   <input
                     type="number"
                     min="1"
-                    className="border p-2.5 rounded-lg"
+                    className="border p-2.5 rounded-lg md:col-span-2"
                     placeholder="Installments"
                     value={String(installmentCount || "")}
                     onChange={(event) =>
@@ -1304,6 +1592,25 @@ export default function CreateInvoice() {
                   <p className="md:col-span-2 text-xs text-gray-500">
                     DP amount selected mode me capture hoga, aur remaining amount financed mana jayega.
                   </p>
+                  <label className="md:col-span-2 text-sm font-medium text-gray-700">
+                    Narration (Optional)
+                  </label>
+                  <textarea
+                    className="border p-2.5 rounded-lg md:col-span-2 min-h-[72px]"
+                    placeholder="e.g. Customer requested delivery after finance approval."
+                    value={paymentNarration}
+                    onChange={(event) => setPaymentNarration(event.target.value)}
+                  />
+                </div>
+              )}
+
+              {paymentMode === "finance_card" && (
+                <div className="pt-3 border-t border-gray-100">
+                  <FinanceDpDetails
+                    source={financeDpSource}
+                    formatAmount={formatCurrency}
+                    className="text-sm text-gray-700"
+                  />
                 </div>
               )}
 

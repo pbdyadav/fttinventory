@@ -41,7 +41,10 @@ alter table public.sales
   add column if not exists invoice_file_path text,
   add column if not exists finance_dp_amount numeric(12,2) default 0,
   add column if not exists installment_count integer default 0,
-  add column if not exists dp_payment_mode text;
+  add column if not exists dp_payment_mode text,
+  add column if not exists partial_dp_cash_amount numeric(12,2),
+  add column if not exists partial_dp_online_amount numeric(12,2),
+  add column if not exists payment_narration text;
 
 alter table public.sales_items
   add column if not exists item_type text default 'laptop',

@@ -5,6 +5,9 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import FinanceDpDetails from "@/components/FinanceDpDetails";
+import { getFinanceDpRemarks } from "@/lib/financeDp";
+import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 
 type SaleRow = {
   id: number;
@@ -20,6 +23,11 @@ type SaleRow = {
   online_amount: number | null;
   finance_dp_amount?: number | null;
   dp_payment_mode?: string | null;
+  partial_dp_cash_amount?: number | null;
+  partial_dp_online_amount?: number | null;
+  payment_narration?: string | null;
+  installment_count?: number | null;
+  salesman_name?: string | null;
 };
 
 type SaleItemRow = {
@@ -103,6 +111,13 @@ const getInvoiceReceivedAmount = (sale: SaleRow) => {
 const getInvoiceNumbers = (sales: SaleRow[]) =>
   sales.map((sale) => sale.invoice_no).filter(Boolean).join(", ");
 
+const getSalesmanNames = (sales: SaleRow[]) => {
+  const names = sales
+    .map((sale) => (sale.salesman_name || "").trim())
+    .filter(Boolean);
+  return [...new Set(names)].join(", ") || "-";
+};
+
 const getInvoicePreview = (sales: SaleRow[]) => {
   const invoiceNumbers = sales.map((sale) => sale.invoice_no).filter(Boolean);
   if (invoiceNumbers.length <= 2) return invoiceNumbers.join(", ") || "-";
@@ -124,6 +139,7 @@ export default function SalesLedger() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [search, setSearch] = useState("");
+  const [salesmanFilter, setSalesmanFilter] = useState("");
 
   useEffect(() => {
     const loadLedger = async () => {
@@ -171,6 +187,7 @@ export default function SalesLedger() {
       const saleTime = getSaleDateValue(sale);
       if (from && saleTime < from) return;
       if (to && saleTime > to) return;
+      if (salesmanFilter && (sale.salesman_name || "") !== salesmanFilter) return;
 
       const key = getCustomerKey(sale.customer_name, sale.customer_mobile);
       const current =
@@ -249,13 +266,14 @@ export default function SalesLedger() {
           customer.customer_address,
           customer.customer_gst,
           getInvoiceNumbers(customer.sales),
+          getSalesmanNames(customer.sales),
         ]
           .join(" ")
           .toLowerCase()
           .includes(term);
       })
       .sort((a, b) => b.outstandingBalance - a.outstandingBalance);
-  }, [fromDate, payments, sales, search, toDate]);
+  }, [fromDate, payments, sales, search, salesmanFilter, toDate]);
 
   const selectedCustomer =
     ledgerCustomers.find((customer) => customer.key === selectedKey) ||
@@ -308,10 +326,13 @@ export default function SalesLedger() {
         invoiceNo: sale.invoice_no,
         mode: getPaymentLabel(sale.payment_mode),
         amount: getInvoiceReceivedAmount(sale),
-        remarks:
+        remarks: [
           sale.payment_mode === "finance_card"
-            ? "Settled through Bajaj / Credit Card bank payment"
+            ? getFinanceDpRemarks(sale) ||
+              "Settled through Bajaj / Credit Card bank payment"
             : "Invoice payment",
+          `Salesman: ${formatSalesmanName(sale.salesman_name)}`,
+        ].join(" | "),
       }))
       .filter((row) => row.amount > 0 || row.mode === "On Credit");
 
@@ -337,27 +358,57 @@ export default function SalesLedger() {
       CustomerName: customer.customer_name,
       MobileNumber: customer.customer_mobile,
       InvoiceNumbers: getInvoiceNumbers(customer.sales),
+      Salesman: getSalesmanNames(customer.sales),
       TotalSales: customer.totalSales,
       TotalReceived: customer.totalReceived,
       OutstandingBalance: customer.outstandingBalance,
       LastTransactionDate: customer.lastTransactionDate,
     }));
 
+    const invoiceRows = sales
+      .filter((sale) => {
+        const saleTime = getSaleDateValue(sale);
+        const from = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+        const to = toDate ? new Date(`${toDate}T23:59:59`).getTime() : null;
+        if (from && saleTime < from) return false;
+        if (to && saleTime > to) return false;
+        if (salesmanFilter && (sale.salesman_name || "") !== salesmanFilter) return false;
+        return true;
+      })
+      .map((sale) => ({
+        InvoiceNo: sale.invoice_no,
+        InvoiceDate: sale.invoice_date,
+        CustomerName: sale.customer_name,
+        Salesman: formatSalesmanName(sale.salesman_name),
+        TotalAmount: Number(sale.total_amount || 0),
+        PaymentMode: sale.payment_mode || "-",
+      }));
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), "SalesLedger");
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(invoiceRows),
+      "InvoiceSalesman"
+    );
 
     if (selectedCustomer) {
       XLSX.utils.book_append_sheet(
         workbook,
         XLSX.utils.json_to_sheet(
-          runningRows.map((row) => ({
-            Date: row.date,
-            Description: row.description,
-            InvoiceNumber: row.description.replace(/^Invoice\s*/, ""),
-            Debit: row.debit,
-            Credit: row.credit,
-            RunningBalance: row.balance,
-          }))
+          runningRows.map((row) => {
+            const invoiceNo = row.description.replace(/^Invoice\s*/, "");
+            const sale = selectedCustomer.sales.find((entry) => entry.invoice_no === invoiceNo);
+            return {
+              Date: row.date,
+              Description: row.description,
+              InvoiceNumber: invoiceNo,
+              Salesman: sale ? formatSalesmanName(sale.salesman_name) : "-",
+              Debit: row.debit,
+              Credit: row.credit,
+              RunningBalance: row.balance,
+            };
+          })
         ),
         "LedgerDetail"
       );
@@ -379,11 +430,12 @@ export default function SalesLedger() {
 
     autoTable(doc, {
       startY: 22,
-      head: [["Customer", "Mobile", "Invoice No", "Total Sales", "Received", "Outstanding", "Last Date"]],
+      head: [["Customer", "Mobile", "Invoice No", "Salesman", "Total Sales", "Received", "Outstanding", "Last Date"]],
       body: ledgerCustomers.map((customer) => [
         customer.customer_name,
         customer.customer_mobile || "-",
         getInvoiceNumbers(customer.sales) || "-",
+        getSalesmanNames(customer.sales),
         formatCurrency(customer.totalSales),
         formatCurrency(customer.totalReceived),
         formatCurrency(customer.outstandingBalance),
@@ -398,15 +450,20 @@ export default function SalesLedger() {
       doc.text(`Ledger Detail: ${selectedCustomer.customer_name}`, 14, 14);
       autoTable(doc, {
         startY: 22,
-        head: [["Date", "Invoice No", "Description", "Debit", "Credit", "Balance"]],
-        body: runningRows.map((row) => [
-          formatDate(row.date),
-          row.description.replace(/^Invoice\s*/, ""),
-          row.description,
-          formatCurrency(row.debit),
-          formatCurrency(row.credit),
-          formatCurrency(row.balance),
-        ]),
+        head: [["Date", "Invoice No", "Salesman", "Description", "Debit", "Credit", "Balance"]],
+        body: runningRows.map((row) => {
+          const invoiceNo = row.description.replace(/^Invoice\s*/, "");
+          const sale = selectedCustomer.sales.find((entry) => entry.invoice_no === invoiceNo);
+          return [
+            formatDate(row.date),
+            invoiceNo,
+            sale ? formatSalesmanName(sale.salesman_name) : "-",
+            row.description,
+            formatCurrency(row.debit),
+            formatCurrency(row.credit),
+            formatCurrency(row.balance),
+          ];
+        }),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [15, 23, 42] },
       });
@@ -446,13 +503,25 @@ export default function SalesLedger() {
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-5">
         <input
           className="rounded-lg border bg-white p-2.5"
-          placeholder="Search customer, mobile or invoice no..."
+          placeholder="Search customer, mobile, salesman or invoice no..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+        <select
+          className="rounded-lg border bg-white p-2.5"
+          value={salesmanFilter}
+          onChange={(event) => setSalesmanFilter(event.target.value)}
+        >
+          <option value="">All Salesmen</option>
+          {SALES_TEAM_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <input
           type="date"
           className="rounded-lg border bg-white p-2.5"
@@ -471,6 +540,7 @@ export default function SalesLedger() {
             setFromDate("");
             setToDate("");
             setSearch("");
+            setSalesmanFilter("");
           }}
           className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 hover:bg-gray-50"
         >
@@ -487,6 +557,7 @@ export default function SalesLedger() {
                 <th className="w-40 p-3 text-left">Invoice Number</th>
                 <th className="w-44 p-3 text-left">Customer Name</th>
                 <th className="w-32 p-3 text-left">Mobile Number</th>
+                <th className="w-36 p-3 text-left">Salesman</th>
                 <th className="w-32 p-3 text-right">Total Sales</th>
                 <th className="w-32 p-3 text-right">Total Received</th>
                 <th className="w-36 p-3 text-right">Outstanding Balance</th>
@@ -510,6 +581,9 @@ export default function SalesLedger() {
                   </td>
                   <td className="p-3 font-medium">{customer.customer_name}</td>
                   <td className="p-3">{customer.customer_mobile || "-"}</td>
+                  <td className="p-3 text-xs" title={getSalesmanNames(customer.sales)}>
+                    <span className="block truncate">{getSalesmanNames(customer.sales)}</span>
+                  </td>
                   <td className="p-3 text-right">{formatCurrency(customer.totalSales)}</td>
                   <td className="p-3 text-right">{formatCurrency(customer.totalReceived)}</td>
                   <td className="p-3 text-right font-semibold">
@@ -520,7 +594,7 @@ export default function SalesLedger() {
               ))}
               {ledgerCustomers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
+                  <td colSpan={8} className="p-8 text-center text-gray-500">
                     No ledger records found.
                   </td>
                 </tr>
@@ -562,21 +636,37 @@ export default function SalesLedger() {
               </div>
 
               <h3 className="mb-2 font-semibold text-gray-900">Complete Sales History</h3>
-              <div className="mb-5 max-h-48 overflow-y-auto rounded border">
+              <div className="mb-5 max-h-64 overflow-y-auto rounded border">
                 <table className="min-w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="p-2 text-left">Invoice</th>
                       <th className="p-2 text-left">Date</th>
+                      <th className="p-2 text-left">Salesman</th>
+                      <th className="p-2 text-left">Payment</th>
                       <th className="p-2 text-right">Total</th>
                       <th className="p-2 text-right">Received</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedCustomer.sales.map((sale) => (
-                      <tr key={sale.id} className="border-t">
+                      <tr key={sale.id} className="border-t align-top">
                         <td className="p-2">{sale.invoice_no}</td>
                         <td className="p-2">{formatDate(sale.invoice_date)}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          {formatSalesmanName(sale.salesman_name)}
+                        </td>
+                        <td className="p-2 min-w-[180px]">
+                          {sale.payment_mode === "finance_card" ? (
+                            <FinanceDpDetails
+                              source={sale}
+                              formatAmount={(value) => `₹${formatCurrency(value)}`}
+                              className="text-[11px] text-gray-600"
+                            />
+                          ) : (
+                            getPaymentLabel(sale.payment_mode)
+                          )}
+                        </td>
                         <td className="p-2 text-right">{formatCurrency(Number(sale.total_amount || 0))}</td>
                         <td className="p-2 text-right">{formatCurrency(getInvoiceReceivedAmount(sale))}</td>
                       </tr>

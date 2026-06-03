@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+import FinanceDpDetails from "@/components/FinanceDpDetails";
+import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 
 const PAYMENT_MODE_OPTIONS = [
   { label: "Cash", value: "cash" },
@@ -30,6 +32,10 @@ type SaleRow = {
   finance_dp_amount?: number | null;
   installment_count?: number | null;
   dp_payment_mode?: string | null;
+  partial_dp_cash_amount?: number | null;
+  partial_dp_online_amount?: number | null;
+  payment_narration?: string | null;
+  salesman_name?: string | null;
 };
 
 type SaleItemRow = {
@@ -80,6 +86,7 @@ export default function Sales() {
     fromDate: "",
     toDate: "",
     paymentMode: "",
+    salesman: "",
   });
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [saleItems, setSaleItems] = useState<SaleItemRow[]>([]);
@@ -129,6 +136,7 @@ export default function Sales() {
         sale.customer_name,
         sale.customer_mobile,
         sale.customer_address,
+        sale.salesman_name || "",
         ...sale.laptopItems.map((item) => item.serial_no || ""),
         ...sale.laptopItems.map((item) => item.machine_code || ""),
         ...sale.laptopItems.map((item) => item.model || ""),
@@ -160,12 +168,16 @@ export default function Sales() {
         }
       }
 
+      if (filters.salesman && (sale.salesman_name || "") !== filters.salesman) {
+        return false;
+      }
+
       return true;
     });
   }, [groupedSales, search, filters]);
 
   const clearAdvancedFilters = () => {
-    setFilters({ fromDate: "", toDate: "", paymentMode: "" });
+    setFilters({ fromDate: "", toDate: "", paymentMode: "", salesman: "" });
   };
 
   const openInvoice = async (sale: SaleRow) => {
@@ -313,7 +325,7 @@ export default function Sales() {
         <input
           type="text"
           className="w-full rounded-lg border bg-white p-2.5"
-          placeholder="Search by invoice no, customer, machine code, serial no or gift..."
+          placeholder="Search by invoice no, customer, salesman, machine code, serial no or gift..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -337,6 +349,12 @@ export default function Sales() {
           onFromDateChange={(value) => setFilters((current) => ({ ...current, fromDate: value }))}
           onToDateChange={(value) => setFilters((current) => ({ ...current, toDate: value }))}
           onSelectChange={(value) => setFilters((current) => ({ ...current, paymentMode: value }))}
+          secondSelectLabel="Salesman"
+          secondSelectValue={filters.salesman}
+          secondSelectOptions={SALES_TEAM_OPTIONS}
+          onSecondSelectChange={(value) =>
+            setFilters((current) => ({ ...current, salesman: value }))
+          }
           onApply={() => setShowAdvancedFilter(false)}
           onClear={clearAdvancedFilters}
           onClose={() => setShowAdvancedFilter(false)}
@@ -350,6 +368,7 @@ export default function Sales() {
               <th className="p-3 text-left">Invoice</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Customer</th>
+              <th className="p-3 text-left">Salesman</th>
               <th className="p-3 text-left">Sold Laptops</th>
               <th className="p-3 text-left">Gift Items</th>
               <th className="p-3 text-left">Payment</th>
@@ -366,6 +385,9 @@ export default function Sales() {
                   <div className="font-medium">{sale.customer_name || "-"}</div>
                   <div className="text-xs text-gray-500">{sale.customer_mobile || "-"}</div>
                   <div className="text-xs text-gray-500">{sale.customer_address || "-"}</div>
+                </td>
+                <td className="p-3 whitespace-nowrap">
+                  {formatSalesmanName(sale.salesman_name)}
                 </td>
                 <td className="p-3 min-w-[260px]">
                   {sale.laptopItems.length ? (
@@ -408,19 +430,24 @@ export default function Sales() {
                     <span className="text-gray-400">No gift</span>
                   )}
                 </td>
-                <td className="p-3 whitespace-nowrap">
-                  <div>{sale.payment_mode || "-"}</div>
-                  {sale.payment_mode === "finance_card" && (
-                    <div className="text-xs text-gray-500">
-                      DP ({sale.dp_payment_mode === "online" ? "Online" : "Cash"}): {formatCurrency(Number(sale.finance_dp_amount || 0))} | EMI: {Number(sale.installment_count || 0)}
-                    </div>
+                <td className="p-3 min-w-[200px]">
+                  {sale.payment_mode === "finance_card" ? (
+                    <FinanceDpDetails
+                      source={sale}
+                      formatAmount={formatCurrency}
+                      className="text-xs text-gray-600"
+                    />
+                  ) : (
+                    <>
+                      <div>{sale.payment_mode || "-"}</div>
+                      <div className="text-xs text-gray-500">
+                        Cash: {formatCurrency(Number(sale.cash_amount || 0))}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Online: {formatCurrency(Number(sale.online_amount || 0))}
+                      </div>
+                    </>
                   )}
-                  <div className="text-xs text-gray-500">
-                    Cash: {formatCurrency(Number(sale.cash_amount || 0))}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Online: {formatCurrency(Number(sale.online_amount || 0))}
-                  </div>
                 </td>
                 <td className="p-3 text-right font-semibold whitespace-nowrap">
                   {formatCurrency(Number(sale.total_amount || 0))}

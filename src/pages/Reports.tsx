@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getFinanceDpBreakdown } from "@/lib/financeDp";
+import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -30,6 +32,7 @@ export default function Reports() {
     fromDate: "",
     toDate: "",
     currentLocation: "",
+    salesman: "",
   });
   const [user, setUser] = useState<any>(() => {
     const cached = localStorage.getItem("user");
@@ -213,11 +216,16 @@ useEffect(() => {
     if (toDate && (!itemDate || itemDate > toDate)) return false;
     if (filters.currentLocation && currentLocation !== filters.currentLocation) return false;
 
+    if (filters.salesman) {
+      const saleInfo = salesMap[String(item.id)];
+      if ((saleInfo?.sale?.salesman_name || "") !== filters.salesman) return false;
+    }
+
     return true;
   });
 
   const clearAdvancedFilters = () => {
-    setFilters({ fromDate: "", toDate: "", currentLocation: "" });
+    setFilters({ fromDate: "", toDate: "", currentLocation: "", salesman: "" });
   };
 
   // ✅ Toggle selection for checkboxes
@@ -410,6 +418,10 @@ useEffect(() => {
       // 🧠 Find the latest transfer for this laptop
       const transfer = transfers?.find((t) => t.laptop_id === r.id);
       const saleInfo = salesMap[String(r.id)] || null;
+      const financeBreakdown =
+        saleInfo?.sale?.payment_mode === "finance_card"
+          ? getFinanceDpBreakdown(saleInfo.sale)
+          : null;
 
       return {
         MachineCode: r.MashinCode,
@@ -451,6 +463,11 @@ useEffect(() => {
         SaleCustomerAddress: saleInfo?.sale?.customer_address || "—",
         SaleCustomerGST: saleInfo?.sale?.customer_gst || "—",
         SalePaymentMode: saleInfo?.sale?.payment_mode || "—",
+        Salesman: formatSalesmanName(saleInfo?.sale?.salesman_name),
+        DPCashAmount: financeBreakdown?.cashAmount ?? "—",
+        DPOnlineAmount: financeBreakdown?.onlineAmount ?? "—",
+        TotalDPAmount: financeBreakdown?.totalAmount ?? "—",
+        Narration: saleInfo?.sale?.payment_narration || "—",
         SaleGiftItems: saleInfo?.sale?.gift_items?.join(", ") || "—",
 
         // 🗒️ Internal Remarks from test
@@ -540,6 +557,12 @@ useEffect(() => {
           onFromDateChange={(value) => setFilters((current) => ({ ...current, fromDate: value }))}
           onToDateChange={(value) => setFilters((current) => ({ ...current, toDate: value }))}
           onSelectChange={(value) => setFilters((current) => ({ ...current, currentLocation: value }))}
+          secondSelectLabel="Salesman"
+          secondSelectValue={filters.salesman}
+          secondSelectOptions={SALES_TEAM_OPTIONS}
+          onSecondSelectChange={(value) =>
+            setFilters((current) => ({ ...current, salesman: value }))
+          }
           onApply={() => setShowAdvancedFilter(false)}
           onClear={clearAdvancedFilters}
           onClose={() => setShowAdvancedFilter(false)}
