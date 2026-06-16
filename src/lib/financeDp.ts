@@ -87,14 +87,23 @@ export const getFinanceDpBreakdown = (
 export const getFinancePaymentDisplay = (
   source: FinanceDpSource
 ): FinancePaymentDisplay | null => {
-  if (source.payment_mode !== "finance_card") return null;
+  const isFinance =
+    source.payment_mode === "finance_card" ||
+    source.payment_mode === "bajaj_card" ||
+    source.payment_mode === "credit_card";
+    
+  if (!isFinance) return null;
 
   const grandTotal = toNumber(source.total_amount);
   const breakdown = getFinanceDpBreakdown(source);
   const isPartialBreakup = breakdown.mode === "partial_cash_online";
+  
+  let label = "Bajaj Finance / Credit Card";
+  if (source.payment_mode === "bajaj_card") label = "Bajaj Card";
+  if (source.payment_mode === "credit_card") label = "Credit Card";
 
   return {
-    paymentModeLabel: "Bajaj Finance / Credit Card",
+    paymentModeLabel: label,
     isPartialBreakup,
     cashAmount: breakdown.cashAmount,
     onlineAmount: breakdown.onlineAmount,

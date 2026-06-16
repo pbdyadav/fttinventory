@@ -47,22 +47,33 @@ export default function LaptopInventory() {
     }
 
     // Attach latest transfer info
-    const enriched = await Promise.all(
-      (laptopsData || []).map(async (lap) => {
-        const { data: transfer } = await supabase
-          .from("transfers")
-          .select("to_location")
-          .eq("laptop_id", lap.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+    const laptopIds = (laptopsData || []).map((l: any) => l.id);
+    const latestTransfersMap: Record<string, string> = {};
 
-        return {
-          ...lap,
-          current_location: transfer?.to_location || "Main Warehouse",
-        };
-      })
-    );
+    if (laptopIds.length > 0) {
+      const chunkSize = 1000;
+      for (let i = 0; i < laptopIds.length; i += chunkSize) {
+        const chunk = laptopIds.slice(i, i + chunkSize);
+        const { data: transfersChunk } = await supabase
+          .from("transfers")
+          .select("laptop_id, to_location")
+          .in("laptop_id", chunk)
+          .order("created_at", { ascending: false });
+
+        if (transfersChunk) {
+          transfersChunk.forEach((t: any) => {
+            if (!latestTransfersMap[t.laptop_id]) {
+              latestTransfersMap[t.laptop_id] = t.to_location;
+            }
+          });
+        }
+      }
+    }
+
+    const enriched = (laptopsData || []).map((lap) => ({
+      ...lap,
+      current_location: latestTransfersMap[lap.id] || "Main Warehouse",
+    }));
 
     setLaptops(enriched);
     setLoading(false);
@@ -256,16 +267,14 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
                 <td className="p-3">{laptop.RAM || "-"}</td>
                 <td className="p-3">{laptop.SSDHdd || "-"}</td>
                 <td className="p-3">{laptop.GraphicCard || "-"}</td>
-                <td className="p-3 font-medium text-blue-700">
-                  <td className="p-3 font-medium">
-                    {laptop.status === "sold" ? (
-                      <span className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded">
-                        SOLD
-                      </span>
-                    ) : (
-                      <span className="text-blue-700">{laptop.current_location}</span>
-                    )}
-                  </td>
+                <td className="p-3 font-medium">
+                  {laptop.status === "sold" ? (
+                    <span className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded">
+                      SOLD
+                    </span>
+                  ) : (
+                    <span className="text-blue-700">{laptop.current_location}</span>
+                  )}
                 </td>
                 <td className="p-3 text-center">
                   <select

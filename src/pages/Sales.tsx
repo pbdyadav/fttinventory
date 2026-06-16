@@ -9,11 +9,14 @@ import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 const PAYMENT_MODE_OPTIONS = [
   { label: "Cash", value: "cash" },
   { label: "Online", value: "online" },
-  { label: "Bajaj", value: "bajaj" },
+  { label: "Partial (Cash + Online)", value: "partial" },
+  { label: "Bajaj Card", value: "bajaj_card" },
   { label: "Credit Card", value: "credit_card" },
   { label: "On Credit", value: "on_credit" },
-  { label: "Parcel Payment", value: "parcel_payment" },
 ];
+
+const isFinanceMode = (mode: string | null | undefined) => 
+  mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
 
 type SaleRow = {
   id: number;
@@ -157,13 +160,11 @@ export default function Sales() {
       if (fromDate && (!saleDate || saleDate < fromDate)) return false;
       if (toDate && (!saleDate || saleDate > toDate)) return false;
       if (filters.paymentMode) {
-        if (filters.paymentMode === "bajaj" && paymentMode !== "finance_card") return false;
-        if (filters.paymentMode === "credit_card" && paymentMode !== "finance_card") return false;
-        if (
-          filters.paymentMode !== "bajaj" &&
-          filters.paymentMode !== "credit_card" &&
-          paymentMode !== filters.paymentMode
-        ) {
+        if (filters.paymentMode === "bajaj_card") {
+          if (paymentMode !== "bajaj_card" && paymentMode !== "finance_card") return false;
+        } else if (filters.paymentMode === "credit_card") {
+          if (paymentMode !== "credit_card" && paymentMode !== "finance_card") return false;
+        } else if (paymentMode !== filters.paymentMode) {
           return false;
         }
       }
@@ -431,7 +432,7 @@ export default function Sales() {
                   )}
                 </td>
                 <td className="p-3 min-w-[200px]">
-                  {sale.payment_mode === "finance_card" ? (
+                  {isFinanceMode(sale.payment_mode) ? (
                     <FinanceDpDetails
                       source={sale}
                       formatAmount={formatCurrency}

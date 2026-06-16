@@ -90,10 +90,15 @@ const getCustomerKey = (name: string | null, mobile: string | null) => {
   return cleanMobile || cleanName;
 };
 
+const isFinanceMode = (mode: string | null | undefined) => 
+  mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
+
 const getPaymentLabel = (paymentMode: string | null) => {
   if (paymentMode === "cash") return "Cash";
   if (paymentMode === "online") return "Online";
-  if (paymentMode === "partial") return "Partial";
+  if (paymentMode === "partial") return "Partial (Cash + Online)";
+  if (paymentMode === "bajaj_card") return "Bajaj Card";
+  if (paymentMode === "credit_card") return "Credit Card";
   if (paymentMode === "finance_card") return "Bajaj / Credit Card";
   if (paymentMode === "on_credit") return "On Credit";
   if (paymentMode === "parcel_payment") return "Parcel Payment";
@@ -101,7 +106,7 @@ const getPaymentLabel = (paymentMode: string | null) => {
 };
 
 const getInvoiceReceivedAmount = (sale: SaleRow) => {
-  if (sale.payment_mode === "finance_card") {
+  if (isFinanceMode(sale.payment_mode)) {
     return Number(sale.total_amount || 0);
   }
 
@@ -327,9 +332,9 @@ export default function SalesLedger() {
         mode: getPaymentLabel(sale.payment_mode),
         amount: getInvoiceReceivedAmount(sale),
         remarks: [
-          sale.payment_mode === "finance_card"
+          isFinanceMode(sale.payment_mode)
             ? getFinanceDpRemarks(sale) ||
-              "Settled through Bajaj / Credit Card bank payment"
+              `Settled through ${getPaymentLabel(sale.payment_mode)} bank payment`
             : "Invoice payment",
           `Salesman: ${formatSalesmanName(sale.salesman_name)}`,
         ].join(" | "),
@@ -657,7 +662,7 @@ export default function SalesLedger() {
                           {formatSalesmanName(sale.salesman_name)}
                         </td>
                         <td className="p-2 min-w-[180px]">
-                          {sale.payment_mode === "finance_card" ? (
+                          {isFinanceMode(sale.payment_mode) ? (
                             <FinanceDpDetails
                               source={sale}
                               formatAmount={(value) => `₹${formatCurrency(value)}`}

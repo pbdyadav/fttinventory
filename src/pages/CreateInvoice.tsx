@@ -51,8 +51,13 @@ type PaymentMode =
   | "cash"
   | "online"
   | "partial"
+  | "bajaj_card"
+  | "credit_card"
   | "finance_card"
   | "on_credit";
+
+const isFinanceMode = (mode: PaymentMode | string | null | undefined) =>
+  mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
 
 const STORAGE_BUCKET = "invoices";
 
@@ -158,6 +163,8 @@ const getPaymentLabel = (mode: PaymentMode) => {
   if (mode === "cash") return "Cash";
   if (mode === "online") return "Online";
   if (mode === "partial") return "Partial";
+  if (mode === "bajaj_card") return "Bajaj Card";
+  if (mode === "credit_card") return "Credit Card";
   if (mode === "finance_card") return "Bajaj Finance / Credit Card";
   return "On Credit";
 };
@@ -173,8 +180,9 @@ const getInvoiceBoxPaymentLabel = (
   mode: PaymentMode,
   dpPaymentMode: FinanceDpMode
 ) => {
-  if (mode === "finance_card") {
-    return `Bajaj Finance / Card (${getDpPaymentLabel(dpPaymentMode)} DP)`;
+  if (isFinanceMode(mode)) {
+    const label = mode === "bajaj_card" ? "Bajaj Card" : mode === "credit_card" ? "Credit Card" : "Bajaj Finance / Card";
+    return `${label} (${getDpPaymentLabel(dpPaymentMode)} DP)`;
   }
 
   return getPaymentLabel(mode);
@@ -319,7 +327,7 @@ export default function CreateInvoice() {
       return;
     }
 
-    if (paymentMode === "finance_card") {
+    if (isFinanceMode(paymentMode)) {
       setCashAmount(financeDpBreakdown.cashAmount);
       setOnlineAmount(financeDpBreakdown.onlineAmount);
     }
@@ -709,7 +717,7 @@ export default function CreateInvoice() {
       320
     );
     const financePdfLines =
-      paymentMode === "finance_card" && financeDisplay
+      isFinanceMode(paymentMode) && financeDisplay
         ? financeDisplay.isPartialBreakup
           ? 5 +
             (financeDisplay.narration
@@ -722,8 +730,11 @@ export default function CreateInvoice() {
                   .length
               : 0)
         : 0;
+    const nonFinancePdfLines = paymentNarration
+      ? doc.splitTextToSize(`Narration: ${paymentNarration}`, 170).length
+      : 0;
     const paymentSummaryHeight =
-      paymentMode === "finance_card" ? 70 + financePdfLines * 14 : 88;
+      isFinanceMode(paymentMode) ? 70 + financePdfLines * 14 : 88 + nonFinancePdfLines * 12;
     const customerBoxHeight = Math.max(
       paymentSummaryHeight,
       32 + addressLines.length * 12 + 20
@@ -747,7 +758,7 @@ export default function CreateInvoice() {
     doc.text("Payment Summary", paymentBoxX, y + 18);
     doc.setFont("helvetica", "normal");
     let paymentLineY = y + 38;
-    if (paymentMode === "finance_card" && financeDisplay) {
+    if (isFinanceMode(paymentMode) && financeDisplay) {
       if (financeDisplay.isPartialBreakup) {
         doc.text("DP Details:", paymentBoxX, paymentLineY);
         paymentLineY += 14;
@@ -799,6 +810,14 @@ export default function CreateInvoice() {
       paymentLineY += 16;
       doc.text(`Online: ${formatCurrency(onlineAmount)}`, paymentBoxX, paymentLineY);
       paymentLineY += 16;
+      if (paymentNarration) {
+        const narrationLines = doc.splitTextToSize(
+          `Narration: ${paymentNarration}`,
+          170
+        );
+        doc.text(narrationLines, paymentBoxX, paymentLineY);
+        paymentLineY += narrationLines.length * 12;
+      }
       doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, paymentLineY);
     }
 
@@ -1116,7 +1135,7 @@ export default function CreateInvoice() {
       return;
     }
 
-    if (paymentMode === "finance_card") {
+    if (isFinanceMode(paymentMode)) {
       if (financeDpTotal <= 0) {
         toast.error("DP amount required hai.");
         return;
@@ -1143,7 +1162,7 @@ export default function CreateInvoice() {
 
     try {
       const financeFields =
-        paymentMode === "finance_card"
+        isFinanceMode(paymentMode)
           ? buildFinanceDpSaveFields({
               dpPaymentMode,
               financeDpAmount,
@@ -1182,7 +1201,7 @@ export default function CreateInvoice() {
               ? Number(onlineAmount || 0)
               : 0,
         finance_dp_amount: financeFields.finance_dp_amount,
-        installment_count: paymentMode === "finance_card" ? Number(installmentCount || 0) : 0,
+        installment_count: isFinanceMode(paymentMode) ? Number(installmentCount || 0) : 0,
         dp_payment_mode: financeFields.dp_payment_mode,
         partial_dp_cash_amount: financeFields.partial_dp_cash_amount,
         partial_dp_online_amount: financeFields.partial_dp_online_amount,
@@ -1418,7 +1437,8 @@ export default function CreateInvoice() {
               <option value="cash">Cash</option>
               <option value="online">Online</option>
               <option value="partial">Partial (Cash + Online)</option>
-              <option value="finance_card">Bajaj Finance / Credit Card</option>
+              <option value="bajaj_card">Bajaj Card</option>
+              <option value="credit_card">Credit Card</option>
               <option value="on_credit">On Credit</option>
             </select>
           </div>
@@ -1522,7 +1542,7 @@ export default function CreateInvoice() {
                 </div>
               )}
 
-              {paymentMode === "finance_card" && (
+              {isFinanceMode(paymentMode) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                   <select
                     value={dpPaymentMode}
@@ -1592,19 +1612,22 @@ export default function CreateInvoice() {
                   <p className="md:col-span-2 text-xs text-gray-500">
                     DP amount selected mode me capture hoga, aur remaining amount financed mana jayega.
                   </p>
-                  <label className="md:col-span-2 text-sm font-medium text-gray-700">
-                    Narration (Optional)
-                  </label>
-                  <textarea
-                    className="border p-2.5 rounded-lg md:col-span-2 min-h-[72px]"
-                    placeholder="e.g. Customer requested delivery after finance approval."
-                    value={paymentNarration}
-                    onChange={(event) => setPaymentNarration(event.target.value)}
-                  />
                 </div>
               )}
 
-              {paymentMode === "finance_card" && (
+              <div className="pt-4 border-t border-gray-100">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Narration (Optional)
+                </label>
+                <textarea
+                  className="w-full border p-2.5 rounded-lg min-h-[72px]"
+                  placeholder="e.g. Customer requested delivery after finance approval."
+                  value={paymentNarration}
+                  onChange={(event) => setPaymentNarration(event.target.value)}
+                />
+              </div>
+
+              {isFinanceMode(paymentMode) && (
                 <div className="pt-3 border-t border-gray-100">
                   <FinanceDpDetails
                     source={financeDpSource}

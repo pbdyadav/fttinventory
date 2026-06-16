@@ -413,13 +413,16 @@ useEffect(() => {
       .select("*")
       .order("transfer_date", { ascending: false }); // ensures latest comes first
 
+    const isFinanceMode = (mode: string | null | undefined) => 
+      mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
+
     // Map reports to include final/latest transfer data
     const formatted = reports.map((r) => {
       // 🧠 Find the latest transfer for this laptop
       const transfer = transfers?.find((t) => t.laptop_id === r.id);
       const saleInfo = salesMap[String(r.id)] || null;
       const financeBreakdown =
-        saleInfo?.sale?.payment_mode === "finance_card"
+        isFinanceMode(saleInfo?.sale?.payment_mode)
           ? getFinanceDpBreakdown(saleInfo.sale)
           : null;
 

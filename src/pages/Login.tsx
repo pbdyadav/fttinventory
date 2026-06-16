@@ -41,7 +41,7 @@ export default function Login() {
         localStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("user", JSON.stringify(userData));
 
-        toast.success(`Welcome ${userData.name}`);
+        toast.success(`Welcome ${userData.name}`, { duration: 2000 });
         navigate("/dashboard");
       }
     } catch (err: any) {
