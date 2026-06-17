@@ -332,10 +332,17 @@ export default function SalesLedger() {
         mode: getPaymentLabel(sale.payment_mode),
         amount: getInvoiceReceivedAmount(sale),
         remarks: [
-          isFinanceMode(sale.payment_mode)
-            ? getFinanceDpRemarks(sale) ||
-              `Settled through ${getPaymentLabel(sale.payment_mode)} bank payment`
-            : "Invoice payment",
+          sale.payment_mode === "credit_card"
+            ? [
+                `Credit Card`,
+                sale.bank_name ? `Bank: ${sale.bank_name}` : null,
+                sale.installment_count ? `EMI: ${sale.installment_count}` : null,
+                sale.payment_narration ? `Narration: ${sale.payment_narration}` : null,
+              ].filter(Boolean).join(" | ")
+            : isFinanceMode(sale.payment_mode)
+              ? getFinanceDpRemarks(sale) ||
+                `Settled through ${getPaymentLabel(sale.payment_mode)} bank payment`
+              : "Invoice payment",
           `Salesman: ${formatSalesmanName(sale.salesman_name)}`,
         ].join(" | "),
       }))

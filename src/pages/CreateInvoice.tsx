@@ -56,8 +56,11 @@ type PaymentMode =
   | "finance_card"
   | "on_credit";
 
-const isFinanceMode = (mode: PaymentMode | string | null | undefined) =>
-  mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
+const isBajajMode = (mode: PaymentMode | string | null | undefined) =>
+  mode === "finance_card" || mode === "bajaj_card";
+
+const isCreditCardMode = (mode: PaymentMode | string | null | undefined) =>
+  mode === "credit_card";
 
 const STORAGE_BUCKET = "invoices";
 
@@ -180,9 +183,12 @@ const getInvoiceBoxPaymentLabel = (
   mode: PaymentMode,
   dpPaymentMode: FinanceDpMode
 ) => {
-  if (isFinanceMode(mode)) {
-    const label = mode === "bajaj_card" ? "Bajaj Card" : mode === "credit_card" ? "Credit Card" : "Bajaj Finance / Card";
+  if (isBajajMode(mode)) {
+    const label = mode === "bajaj_card" ? "Bajaj Card" : "Bajaj Finance / Card";
     return `${label} (${getDpPaymentLabel(dpPaymentMode)} DP)`;
+  }
+  if (isCreditCardMode(mode)) {
+    return "Credit Card";
   }
 
   return getPaymentLabel(mode);
@@ -271,6 +277,8 @@ export default function CreateInvoice() {
   const [installmentCount, setInstallmentCount] = useState(0);
   const [dpPaymentMode, setDpPaymentMode] = useState<FinanceDpMode>("cash");
   const [paymentNarration, setPaymentNarration] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [emiAmount, setEmiAmount] = useState<number | "">("");
   const [salesmanName, setSalesmanName] = useState("");
 
   const subtotal = useMemo(
@@ -327,7 +335,7 @@ export default function CreateInvoice() {
       return;
     }
 
-    if (isFinanceMode(paymentMode)) {
+    if (isBajajMode(paymentMode)) {
       setCashAmount(financeDpBreakdown.cashAmount);
       setOnlineAmount(financeDpBreakdown.onlineAmount);
     }
@@ -459,6 +467,9 @@ export default function CreateInvoice() {
         setFinanceDpAmount(Number(saleData.finance_dp_amount || 0));
         setPartialDpCashAmount(loadedBreakdown.cashAmount);
         setPartialDpOnlineAmount(loadedBreakdown.onlineAmount);
+
+        setBankName(saleData.bank_name || "");
+        setEmiAmount(saleData.emi_amount || "");
         setInstallmentCount(Number(saleData.installment_count || 0));
         setPaymentNarration(saleData.payment_narration || "");
         setSalesmanName(saleData.salesman_name || "");
@@ -717,7 +728,7 @@ export default function CreateInvoice() {
       320
     );
     const financePdfLines =
-      isFinanceMode(paymentMode) && financeDisplay
+      isBajajMode(paymentMode) && financeDisplay
         ? financeDisplay.isPartialBreakup
           ? 5 +
             (financeDisplay.narration
@@ -734,7 +745,7 @@ export default function CreateInvoice() {
       ? doc.splitTextToSize(`Narration: ${paymentNarration}`, 170).length
       : 0;
     const paymentSummaryHeight =
-      isFinanceMode(paymentMode) ? 70 + financePdfLines * 14 : 88 + nonFinancePdfLines * 12;
+      isBajajMode(paymentMode) ? 70 + financePdfLines * 14 : isCreditCardMode(paymentMode) ? 120 + nonFinancePdfLines * 12 : 88 + nonFinancePdfLines * 12;
     const customerBoxHeight = Math.max(
       paymentSummaryHeight,
       32 + addressLines.length * 12 + 20
@@ -758,7 +769,7 @@ export default function CreateInvoice() {
     doc.text("Payment Summary", paymentBoxX, y + 18);
     doc.setFont("helvetica", "normal");
     let paymentLineY = y + 38;
-    if (isFinanceMode(paymentMode) && financeDisplay) {
+    if (isBajajMode(paymentMode) && financeDisplay) {
       if (financeDisplay.isPartialBreakup) {
         doc.text("DP Details:", paymentBoxX, paymentLineY);
         paymentLineY += 14;
@@ -799,6 +810,34 @@ export default function CreateInvoice() {
       if (financeDisplay.narration) {
         const narrationLines = doc.splitTextToSize(
           `Narration: ${financeDisplay.narration}`,
+          170
+        );
+        doc.text(narrationLines, paymentBoxX, paymentLineY);
+        paymentLineY += narrationLines.length * 12;
+      }
+      doc.text(`Grand Total: ${formatCurrency(total)}`, paymentBoxX, paymentLineY);
+    } else if (isCreditCardMode(paymentMode)) {
+      doc.text(`Bank: ${bankName || "-"}`, paymentBoxX, paymentLineY);
+      paymentLineY += 16;
+      doc.text(`EMI Months: ${installmentCount || 0}`, paymentBoxX, paymentLineY);
+      paymentLineY += 16;
+      doc.text(`EMI Amount: ${formatCurrency(Number(emiAmount || 0))}`, paymentBoxX, paymentLineY);
+      paymentLineY += 16;
+      if (Number(cashAmount) > 0 || Number(onlineAmount) > 0) {
+        doc.text(`Customer Contribution:`, paymentBoxX, paymentLineY);
+        paymentLineY += 16;
+        if (Number(cashAmount) > 0) {
+          doc.text(`  Cash: ${formatCurrency(Number(cashAmount))}`, paymentBoxX, paymentLineY);
+          paymentLineY += 16;
+        }
+        if (Number(onlineAmount) > 0) {
+          doc.text(`  Online: ${formatCurrency(Number(onlineAmount))}`, paymentBoxX, paymentLineY);
+          paymentLineY += 16;
+        }
+      }
+      if (paymentNarration) {
+        const narrationLines = doc.splitTextToSize(
+          `Narration: ${paymentNarration}`,
           170
         );
         doc.text(narrationLines, paymentBoxX, paymentLineY);
@@ -1135,7 +1174,7 @@ export default function CreateInvoice() {
       return;
     }
 
-    if (isFinanceMode(paymentMode)) {
+    if (isBajajMode(paymentMode)) {
       if (financeDpTotal <= 0) {
         toast.error("DP amount required hai.");
         return;
@@ -1156,13 +1195,28 @@ export default function CreateInvoice() {
       }
     }
 
+    if (isCreditCardMode(paymentMode)) {
+      if (!bankName.trim()) {
+        toast.error("Bank Name is required for Credit Card payment.");
+        return;
+      }
+      if (installmentCount <= 0) {
+        toast.error("EMI Months (Installments) required hai.");
+        return;
+      }
+      if (!emiAmount || Number(emiAmount) <= 0) {
+        toast.error("EMI Amount required hai.");
+        return;
+      }
+    }
+
     setSaving(true);
     const invoiceNo = isEditMode ? invoiceNoPreview : await generateInvoiceNo();
     setInvoiceNoPreview(invoiceNo);
 
     try {
       const financeFields =
-        isFinanceMode(paymentMode)
+        isBajajMode(paymentMode)
           ? buildFinanceDpSaveFields({
               dpPaymentMode,
               financeDpAmount,
@@ -1172,14 +1226,17 @@ export default function CreateInvoice() {
             })
           : {
               finance_dp_amount: 0,
-              installment_count: 0,
               dp_payment_mode: null,
               partial_dp_cash_amount: null,
               partial_dp_online_amount: null,
-              payment_narration: null,
+              payment_narration: paymentNarration || null,
             };
 
-      const salePayload = {
+      const finalInstallmentCount = (isBajajMode(paymentMode) || isCreditCardMode(paymentMode))
+        ? Number(installmentCount || 0)
+        : 0;
+
+      const salePayload: any = {
         invoice_no: invoiceNo,
         invoice_date: invoiceDate,
         customer_name: customer.name,
@@ -1191,23 +1248,31 @@ export default function CreateInvoice() {
         cash_amount:
           paymentMode === "cash"
             ? total
-            : paymentMode === "partial"
+            : paymentMode === "partial" || isCreditCardMode(paymentMode)
               ? Number(cashAmount || 0)
               : 0,
         online_amount:
           paymentMode === "online"
             ? total
-            : paymentMode === "partial"
+            : paymentMode === "partial" || isCreditCardMode(paymentMode)
               ? Number(onlineAmount || 0)
               : 0,
         finance_dp_amount: financeFields.finance_dp_amount,
-        installment_count: isFinanceMode(paymentMode) ? Number(installmentCount || 0) : 0,
+        installment_count: finalInstallmentCount,
         dp_payment_mode: financeFields.dp_payment_mode,
         partial_dp_cash_amount: financeFields.partial_dp_cash_amount,
         partial_dp_online_amount: financeFields.partial_dp_online_amount,
-        payment_narration: financeFields.payment_narration,
+        payment_narration: paymentNarration || null,
         salesman_name: salesmanName,
       };
+
+      if (isCreditCardMode(paymentMode)) {
+        salePayload.bank_name = bankName;
+        salePayload.emi_amount = Number(emiAmount || 0);
+      } else {
+        salePayload.bank_name = null;
+        salePayload.emi_amount = null;
+      }
 
       const runSaleMutation = (payload: typeof salePayload) =>
         isEditMode
@@ -1542,7 +1607,7 @@ export default function CreateInvoice() {
                 </div>
               )}
 
-              {isFinanceMode(paymentMode) && (
+              {isBajajMode(paymentMode) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                   <select
                     value={dpPaymentMode}
@@ -1627,13 +1692,71 @@ export default function CreateInvoice() {
                 />
               </div>
 
-              {isFinanceMode(paymentMode) && (
+              {isBajajMode(paymentMode) && (
                 <div className="pt-3 border-t border-gray-100">
                   <FinanceDpDetails
                     source={financeDpSource}
                     formatAmount={formatCurrency}
                     className="text-sm text-gray-700"
                   />
+                </div>
+              )}
+
+              {isCreditCardMode(paymentMode) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <input
+                    type="text"
+                    className="border p-2.5 rounded-lg md:col-span-2"
+                    placeholder="Bank Name"
+                    value={bankName}
+                    onChange={(event) => setBankName(event.target.value)}
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="EMI Months"
+                    value={String(installmentCount || "")}
+                    onChange={(event) =>
+                      setInstallmentCount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="EMI Amount"
+                    value={String(emiAmount || "")}
+                    onChange={(event) =>
+                      setEmiAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <h3 className="md:col-span-2 text-sm font-medium text-gray-700 pt-2 border-t border-gray-100">
+                    Customer Contribution (Optional)
+                  </h3>
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Cash Amount"
+                    value={String(cashAmount || "")}
+                    onChange={(event) =>
+                      setCashAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="border p-2.5 rounded-lg"
+                    placeholder="Online Amount"
+                    value={String(onlineAmount || "")}
+                    onChange={(event) =>
+                      setOnlineAmount(normalizePositiveNumber(event.target.value))
+                    }
+                  />
+                  <p className="md:col-span-2 text-xs text-gray-500">
+                    Note: For Credit Card, the full total is considered received via Bank. Any customer contribution here is for record keeping of downpayments.
+                  </p>
                 </div>
               )}
 

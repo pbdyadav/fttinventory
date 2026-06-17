@@ -22,6 +22,27 @@ export default function FinanceDpDetails({
   formatAmount = defaultFormatAmount,
   className = "",
 }: FinanceDpDetailsProps) {
+  if (source.payment_mode === "credit_card") {
+    return (
+      <div className={`space-y-0.5 ${className}`}>
+        <div>Payment Mode: Credit Card</div>
+        {source.bank_name && <div>Bank: {source.bank_name}</div>}
+        {Number(source.installment_count) > 0 && <div>EMI Months: {Number(source.installment_count)}</div>}
+        {Number(source.emi_amount) > 0 && <div>EMI Amount: {formatAmount(Number(source.emi_amount))}</div>}
+        {(Number(source.cash_amount) > 0 || Number(source.online_amount) > 0) && (
+          <div className="pt-1">
+            <span className="font-medium text-gray-600">Customer Contribution:</span>
+            {Number(source.cash_amount) > 0 && <div>Cash: {formatAmount(Number(source.cash_amount))}</div>}
+            {Number(source.online_amount) > 0 && <div>Online: {formatAmount(Number(source.online_amount))}</div>}
+          </div>
+        )}
+        {source.payment_narration ? (
+          <div className="pt-0.5">Narration: {source.payment_narration}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   const display = getFinancePaymentDisplay(source);
   if (!display) return null;
 

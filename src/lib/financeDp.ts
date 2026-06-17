@@ -9,6 +9,10 @@ export type FinanceDpSource = {
   partial_dp_online_amount?: number | string | null;
   installment_count?: number | string | null;
   payment_narration?: string | null;
+  bank_name?: string | null;
+  emi_amount?: number | string | null;
+  cash_amount?: number | string | null;
+  online_amount?: number | string | null;
 };
 
 export type FinanceDpBreakdown = {
@@ -89,8 +93,7 @@ export const getFinancePaymentDisplay = (
 ): FinancePaymentDisplay | null => {
   const isFinance =
     source.payment_mode === "finance_card" ||
-    source.payment_mode === "bajaj_card" ||
-    source.payment_mode === "credit_card";
+    source.payment_mode === "bajaj_card";
     
   if (!isFinance) return null;
 
@@ -100,7 +103,6 @@ export const getFinancePaymentDisplay = (
   
   let label = "Bajaj Finance / Credit Card";
   if (source.payment_mode === "bajaj_card") label = "Bajaj Card";
-  if (source.payment_mode === "credit_card") label = "Credit Card";
 
   return {
     paymentModeLabel: label,
