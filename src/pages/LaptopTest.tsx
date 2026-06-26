@@ -245,12 +245,19 @@ window.location.href = "/login"; */}
             <option>i9</option>
             <option>Ryzen 5</option>
             <option>Ryzen 7</option>
+            <option>Ultra</option>
+            <option>Ultra-5</option>
+            <option>Ultra-7</option>
             <option>M-1 Air</option>
             <option>M-1 Pro</option>
             <option>M-2 Air</option>
             <option>M-2 Pro</option>
             <option>M-3 Air</option>
             <option>M-3 Pro</option>
+            <option>M-4 Air</option>
+            <option>M-4 Pro</option>
+            <option>M-5 Air</option>
+            <option>M-5 Pro</option>
           </select>
           <select {...register("Gen")} className="w-full border p-2 rounded">
             <option value="">Select Generation</option>
@@ -310,6 +317,7 @@ window.location.href = "/login"; */}
             <option>HD"</option>
             <option>HDR"</option>
             <option>FHD"</option>
+            <option>2K"</option>
             <option>4K"</option>
             <option>Liquid Retina XDR"</option>
           </select>
