@@ -45,6 +45,7 @@ type InvoiceItem = {
 
 type LocationState = {
   currentLocation?: string;
+  saleMode?: "sale" | "godown";
 };
 
 type PaymentMode =
@@ -253,6 +254,7 @@ export default function CreateInvoice() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state || {}) as LocationState;
+  const saleMode = locationState.saleMode === "godown" ? "godown" : "sale";
   const isEditMode = Boolean(saleId);
 
   const [loading, setLoading] = useState(true);
@@ -1060,10 +1062,13 @@ export default function CreateInvoice() {
     item: InvoiceItem,
     invoiceNo: string
   ) => {
+    const saleLocationLabel =
+      saleMode === "godown" ? "Godown Sale" : "Sale (Invoice)";
+
     const basePayload = {
       laptop_id: item.laptopId,
       from_location: item.sourceLocation || "Main Warehouse",
-      to_location: "Sold",
+      to_location: saleLocationLabel,
       person_name: customer.name,
       contact_info: customer.mobile,
       address: customer.address,
@@ -1074,7 +1079,7 @@ export default function CreateInvoice() {
 
     const { error } = await supabase.from("transfers").insert({
       ...basePayload,
-      transfer_type: "sale",
+      transfer_type: saleMode === "godown" ? "godown" : "sale",
     });
     if (!error) return;
 
@@ -1092,7 +1097,7 @@ export default function CreateInvoice() {
     if (message.includes("sale_invoice_id")) {
       candidatePayloads.push({
         ...basePayload,
-        transfer_type: "sale",
+        transfer_type: saleMode === "godown" ? "godown" : "sale",
       });
     }
 
@@ -1450,7 +1455,11 @@ export default function CreateInvoice() {
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            {isEditMode ? "Edit Sale Invoice" : "Create Sale Invoice"}
+            {isEditMode
+              ? "Edit Sale Invoice"
+              : saleMode === "godown"
+                ? "Godown Sale"
+                : "Sale (Invoice)"}
           </h1>
           <p className="text-sm text-gray-500">
             As soon as the sale is saved, the laptop will be marked as 'Sold' in the inventory and added to the sales list.
@@ -1777,22 +1786,6 @@ export default function CreateInvoice() {
                 You can also add complimentary or chargeable gift items along with the laptop.
               </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg"
-                onClick={addLaptopItem}
-              >
-                + Add Laptop
-              </button>
-              <button
-                type="button"
-                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg"
-                onClick={addGiftItem}
-              >
-                + Add Gift
-              </button>
-            </div>
           </div>
 
           {items.map((item, index) => (
@@ -1955,6 +1948,23 @@ export default function CreateInvoice() {
               </div>
             </div>
           ))}
+
+          <div className="flex justify-end gap-2 flex-wrap">
+            <button
+              type="button"
+              className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg"
+              onClick={addLaptopItem}
+            >
+              + Add Laptop
+            </button>
+            <button
+              type="button"
+              className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg"
+              onClick={addGiftItem}
+            >
+              + Add Gift
+            </button>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 flex-wrap">

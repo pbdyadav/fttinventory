@@ -1,9 +1,10 @@
 // src/pages/LaptopInventory.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+import PaginationControls from "@/components/PaginationControls";
 
 const LOCATION_OPTIONS = [
   { label: "Main Warehouse", value: "Main Warehouse" },
@@ -18,6 +19,8 @@ export default function LaptopInventory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");   // ✅ NEW
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [pageSize, setPageSize] = useState<25 | 50 | 100 | 250 | "all">(25);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     fromDate: "",
     toDate: "",
@@ -83,11 +86,25 @@ export default function LaptopInventory() {
 
     // Normalize sale option
     const isSale = type === "Sale (Invoice)";
+    const isGodownSale = type === "Godown Sale";
 
     // ✅ Allow SALE from ANY location
     if (isSale) {
       navigate(`/invoice/${laptop.id}`, {
-        state: { currentLocation: laptop.current_location || "Main Warehouse" },
+        state: {
+          currentLocation: laptop.current_location || "Main Warehouse",
+          saleMode: "sale",
+        },
+      });
+      return;
+    }
+
+    if (isGodownSale) {
+      navigate(`/invoice/${laptop.id}`, {
+        state: {
+          currentLocation: laptop.current_location || "Main Warehouse",
+          saleMode: "godown",
+        },
       });
       return;
     }
@@ -166,10 +183,10 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
   };
 
 
-  if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
-
   // ✅ FILTERED LIST (New)
-  const filteredLaptops = laptops
+  const filteredLaptops = useMemo(
+    () =>
+      laptops
     .filter((item) =>
       item.MashinCode?.toString().includes(search.toLowerCase()) ||
       item.SerialNo?.toLowerCase().includes(search.toLowerCase()) ||
@@ -190,11 +207,43 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
       if (filters.currentLocation && currentLocation !== filters.currentLocation) return false;
 
       return true;
-    });
+    }),
+    [laptops, search, filters]
+  );
+
+  const pageSizeValue = pageSize === "all" ? filteredLaptops.length || 1 : pageSize;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filteredLaptops.length / pageSizeValue));
+
+  const paginatedLaptops = useMemo(() => {
+    if (pageSize === "all") return filteredLaptops;
+    const startIndex = (currentPage - 1) * pageSizeValue;
+    return filteredLaptops.slice(startIndex, startIndex + pageSizeValue);
+  }, [filteredLaptops, currentPage, pageSize, pageSizeValue]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filters.fromDate, filters.toDate, filters.currentLocation, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageSizeChange = (nextSize: 25 | 50 | 100 | 250 | "all") => {
+    setPageSize(nextSize);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const table = document.getElementById("inventory-table-scroll");
+    table?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const clearAdvancedFilters = () => {
     setFilters({ fromDate: "", toDate: "", currentLocation: "" });
   };
+
+  if (loading) return <p className="text-gray-500 p-4">Loading inventory...</p>;
 
   return (
     <div className="p-6">
@@ -235,9 +284,13 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
         />
       )}
 
-      <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border border-gray-200">
+      <div
+        id="inventory-table-scroll"
+        className="overflow-auto bg-white rounded-2xl shadow-lg border border-gray-200"
+        style={{ maxHeight: "calc(100vh - 22rem)" }}
+      >
         <table className="min-w-full text-sm text-gray-800">
-          <thead className="bg-gray-100 text-gray-700 uppercase tracking-wide">
+          <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700 uppercase tracking-wide">
             <tr>
               <th className="p-3 text-left w-[8%]">Machine Code</th>
               <th className="p-3 text-left w-[15%]">Serial No</th>
@@ -253,7 +306,7 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
           </thead>
 
           <tbody>
-            {filteredLaptops.map((laptop, i) => (
+            {paginatedLaptops.map((laptop, i) => (
               <tr
                 key={laptop.id}
                 className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50"
@@ -294,6 +347,17 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
           </tbody>
 
         </table>
+      </div>
+
+      <div className="mt-4">
+        <PaginationControls
+          totalItems={filteredLaptops.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
 import FinanceDpDetails from "@/components/FinanceDpDetails";
+import PaginationControls from "@/components/PaginationControls";
 import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 
 const PAYMENT_MODE_OPTIONS = [
@@ -39,6 +40,11 @@ type SaleRow = {
   partial_dp_online_amount?: number | null;
   payment_narration?: string | null;
   salesman_name?: string | null;
+};
+
+type TransferSourceRow = {
+  sale_invoice_id: number | null;
+  from_location: string | null;
 };
 
 type SaleItemRow = {
@@ -85,6 +91,8 @@ export default function Sales() {
   const [busySaleId, setBusySaleId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [pageSize, setPageSize] = useState<25 | 50 | 100 | 250 | "all">(25);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     fromDate: "",
     toDate: "",
@@ -93,21 +101,29 @@ export default function Sales() {
   });
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [saleItems, setSaleItems] = useState<SaleItemRow[]>([]);
+  const [transferSources, setTransferSources] = useState<TransferSourceRow[]>([]);
 
   const loadSales = async () => {
     setLoading(true);
 
-    const [{ data: salesData, error: salesError }, { data: itemsData, error: itemsError }] =
+    const [
+      { data: salesData, error: salesError },
+      { data: itemsData, error: itemsError },
+      { data: transfersData, error: transfersError },
+    ] =
       await Promise.all([
         supabase.from("sales").select("*").order("invoice_date", { ascending: false }),
         supabase.from("sales_items").select("*").order("sale_id", { ascending: false }),
+        supabase.from("transfers").select("sale_invoice_id, from_location, created_at"),
       ]);
 
     if (salesError) console.error("Sales load error:", salesError);
     if (itemsError) console.error("Sales items load error:", itemsError);
+    if (transfersError) console.error("Sales transfer load error:", transfersError);
 
     setSales((salesData || []) as SaleRow[]);
     setSaleItems((itemsData || []) as SaleItemRow[]);
+    setTransferSources((transfersData || []) as TransferSourceRow[]);
     setLoading(false);
   };
 
@@ -130,6 +146,32 @@ export default function Sales() {
       };
     });
   }, [sales, saleItems]);
+
+  const saleFromMap = useMemo(() => {
+    const groupedLocations: Record<number, Set<string>> = {};
+
+    transferSources.forEach((transfer) => {
+      if (!transfer.sale_invoice_id || !transfer.from_location) return;
+
+      const saleId = transfer.sale_invoice_id;
+      const location = transfer.from_location.trim();
+
+      if (!location) return;
+
+      if (!groupedLocations[saleId]) {
+        groupedLocations[saleId] = new Set();
+      }
+
+      groupedLocations[saleId].add(location);
+    });
+
+    return Object.fromEntries(
+      Object.entries(groupedLocations).map(([saleId, locations]) => [
+        Number(saleId),
+        Array.from(locations).join(", "),
+      ])
+    ) as Record<number, string>;
+  }, [transferSources]);
 
   const filteredSales = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -176,6 +218,34 @@ export default function Sales() {
       return true;
     });
   }, [groupedSales, search, filters]);
+
+  const pageSizeValue = pageSize === "all" ? filteredSales.length || 1 : pageSize;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filteredSales.length / pageSizeValue));
+
+  const paginatedSales = useMemo(() => {
+    if (pageSize === "all") return filteredSales;
+    const startIndex = (currentPage - 1) * pageSizeValue;
+    return filteredSales.slice(startIndex, startIndex + pageSizeValue);
+  }, [filteredSales, currentPage, pageSize, pageSizeValue]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filters.fromDate, filters.toDate, filters.paymentMode, filters.salesman, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageSizeChange = (nextSize: 25 | 50 | 100 | 250 | "all") => {
+    setPageSize(nextSize);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const table = document.getElementById("sales-register-table-scroll");
+    table?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const clearAdvancedFilters = () => {
     setFilters({ fromDate: "", toDate: "", paymentMode: "", salesman: "" });
@@ -362,13 +432,18 @@ export default function Sales() {
         />
       )}
 
-      <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-sm">
+      <div
+        id="sales-register-table-scroll"
+        className="overflow-auto bg-white rounded-2xl border border-gray-200 shadow-sm"
+        style={{ maxHeight: "calc(100vh - 22rem)" }}
+      >
         <table className="min-w-full text-sm text-gray-800">
-          <thead className="bg-gray-100 text-gray-700">
+          <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700">
             <tr>
               <th className="p-3 text-left">Invoice</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Customer</th>
+              <th className="p-3 text-left">Sale From</th>
               <th className="p-3 text-left">Salesman</th>
               <th className="p-3 text-left">Sold Laptops</th>
               <th className="p-3 text-left">Gift Items</th>
@@ -378,7 +453,7 @@ export default function Sales() {
             </tr>
           </thead>
           <tbody>
-            {filteredSales.map((sale) => (
+            {paginatedSales.map((sale) => (
               <tr key={sale.id} className="border-t align-top hover:bg-gray-50">
                 <td className="p-3 font-semibold">{sale.invoice_no}</td>
                 <td className="p-3 whitespace-nowrap">{formatDate(sale.invoice_date)}</td>
@@ -387,6 +462,7 @@ export default function Sales() {
                   <div className="text-xs text-gray-500">{sale.customer_mobile || "-"}</div>
                   <div className="text-xs text-gray-500">{sale.customer_address || "-"}</div>
                 </td>
+                <td className="p-3 min-w-[160px]">{saleFromMap[sale.id] || "-"}</td>
                 <td className="p-3 whitespace-nowrap">
                   {formatSalesmanName(sale.salesman_name)}
                 </td>
@@ -483,13 +559,24 @@ export default function Sales() {
             ))}
             {filteredSales.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-gray-500">
+                <td colSpan={10} className="p-8 text-center text-gray-500">
                   No sales found.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-4">
+        <PaginationControls
+          totalItems={filteredSales.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );

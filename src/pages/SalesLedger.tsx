@@ -6,6 +6,7 @@ import { saveAs } from "file-saver";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import FinanceDpDetails from "@/components/FinanceDpDetails";
+import PaginationControls from "@/components/PaginationControls";
 import { getFinanceDpRemarks } from "@/lib/financeDp";
 import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
 
@@ -145,6 +146,8 @@ export default function SalesLedger() {
   const [toDate, setToDate] = useState("");
   const [search, setSearch] = useState("");
   const [salesmanFilter, setSalesmanFilter] = useState("");
+  const [pageSize, setPageSize] = useState<25 | 50 | 100 | 250 | "all">(25);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const loadLedger = async () => {
@@ -279,6 +282,34 @@ export default function SalesLedger() {
       })
       .sort((a, b) => b.outstandingBalance - a.outstandingBalance);
   }, [fromDate, payments, sales, search, salesmanFilter, toDate]);
+
+  const pageSizeValue = pageSize === "all" ? ledgerCustomers.length || 1 : pageSize;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(ledgerCustomers.length / pageSizeValue));
+
+  const paginatedLedgerCustomers = useMemo(() => {
+    if (pageSize === "all") return ledgerCustomers;
+    const startIndex = (currentPage - 1) * pageSizeValue;
+    return ledgerCustomers.slice(startIndex, startIndex + pageSizeValue);
+  }, [ledgerCustomers, currentPage, pageSize, pageSizeValue]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, fromDate, toDate, salesmanFilter, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageSizeChange = (nextSize: 25 | 50 | 100 | 250 | "all") => {
+    setPageSize(nextSize);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const table = document.getElementById("sales-ledger-table-scroll");
+    table?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const selectedCustomer =
     ledgerCustomers.find((customer) => customer.key === selectedKey) ||
@@ -562,9 +593,13 @@ export default function SalesLedger() {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div className="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div
+            id="sales-ledger-table-scroll"
+            className="overflow-auto"
+            style={{ maxHeight: "calc(100vh - 22rem)" }}
+          >
           <table className="min-w-[980px] table-fixed text-sm text-gray-800">
-            <thead className="bg-gray-100 text-gray-700">
+            <thead className="sticky top-0 z-10 bg-gray-100 text-gray-700">
               <tr>
                 <th className="w-40 p-3 text-left">Invoice Number</th>
                 <th className="w-44 p-3 text-left">Customer Name</th>
@@ -577,7 +612,7 @@ export default function SalesLedger() {
               </tr>
             </thead>
             <tbody>
-              {ledgerCustomers.map((customer) => (
+              {paginatedLedgerCustomers.map((customer) => (
                 <tr
                   key={customer.key}
                   className={`cursor-pointer border-t hover:bg-gray-50 ${
@@ -616,7 +651,10 @@ export default function SalesLedger() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div
+          className="overflow-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+          style={{ maxHeight: "calc(100vh - 22rem)" }}
+        >
           {selectedCustomer ? (
             <>
               <div className="mb-4">
@@ -756,6 +794,17 @@ export default function SalesLedger() {
             <div className="p-8 text-center text-gray-500">Select a ledger row.</div>
           )}
         </div>
+      </div>
+
+      <div className="mt-4">
+        <PaginationControls
+          totalItems={ledgerCustomers.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );

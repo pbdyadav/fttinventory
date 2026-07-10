@@ -111,13 +111,13 @@ export default function Dashboard() {
         // -------------------------
         const { data: testModels } = await supabase
           .from("laptop_tests")
-          .select("model");
+          .select("Model");
 
         if (mounted) {
           const map = new Map<string, number>();
 
           (testModels || []).forEach((row) => {
-            const model = (row.model || "Unknown").toString().trim();
+            const model = (row.Model || "Unknown").toString().trim();
             if (!model) return;
             map.set(model, (map.get(model) || 0) + 1);
           });

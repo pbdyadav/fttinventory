@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getFinanceDpBreakdown } from "@/lib/financeDp";
 import { SALES_TEAM_OPTIONS, formatSalesmanName } from "@/lib/salesTeam";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import FTTLogo from "@/assets/logo.png";
 import { useNavigate } from "react-router-dom";
 import AdvancedFilterPanel from "@/components/AdvancedFilterPanel";
+import PaginationControls from "@/components/PaginationControls";
+
 
 const LOCATION_OPTIONS = [
   { label: "Main Warehouse", value: "Main Warehouse" },
@@ -28,6 +30,8 @@ export default function Reports() {
   const [locationMap, setLocationMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState(""); // <-- ADDED: Search state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [pageSize, setPageSize] = useState<25 | 50 | 100 | 250 | "all">(25);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     fromDate: "",
     toDate: "",
@@ -188,10 +192,6 @@ useEffect(() => {
     loadData();
   }, [user, role]);
 
-  if (!user || loading) {
-    return <p className="p-6 text-gray-500">Loading reports...</p>;
-  }
-
   // ✅ Filtering logic using the search state
   const lowerSearch = search.toLowerCase();
   const filteredReports = reports.filter((item) => {
@@ -224,9 +224,40 @@ useEffect(() => {
     return true;
   });
 
+  const pageSizeValue = pageSize === "all" ? filteredReports.length || 1 : pageSize;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filteredReports.length / pageSizeValue));
+  const paginatedReports = useMemo(() => {
+    if (pageSize === "all") return filteredReports;
+    const startIndex = (currentPage - 1) * pageSizeValue;
+    return filteredReports.slice(startIndex, startIndex + pageSizeValue);
+  }, [filteredReports, currentPage, pageSize, pageSizeValue]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filters.fromDate, filters.toDate, filters.currentLocation, filters.salesman, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageSizeChange = (nextSize: 25 | 50 | 100 | 250 | "all") => {
+    setPageSize(nextSize);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const table = document.getElementById("reports-table-scroll");
+    table?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const clearAdvancedFilters = () => {
     setFilters({ fromDate: "", toDate: "", currentLocation: "", salesman: "" });
   };
+
+  if (!user || loading) {
+    return <p className="p-6 text-gray-500">Loading reports...</p>;
+  }
 
   // ✅ Toggle selection for checkboxes
   const toggleSelect = (id: string) => {
@@ -573,9 +604,13 @@ useEffect(() => {
       )}
       {/* 🔍 END Search Input */}
 
-      <div className="overflow-x-auto bg-white rounded-xl shadow border">
+      <div
+        id="reports-table-scroll"
+        className="overflow-auto bg-white rounded-xl shadow border"
+        style={{ maxHeight: "calc(100vh - 22rem)" }}
+      >
         <table className="min-w-full text-sm text-gray-800">
-          <thead className="bg-gray-200">
+          <thead className="sticky top-0 z-10 bg-gray-200">
             <tr>
               <th className="p-3 text-left">
                 <input
@@ -608,7 +643,7 @@ useEffect(() => {
           </thead>
           <tbody>
             {/* CORRECTED: The syntax error was here (an extra brace {) */}
-            {filteredReports.map((r) => (
+            {paginatedReports.map((r) => (
               <tr key={r.id} className="border-t hover:bg-gray-50">
                 <td className="p-3">
                   <input
@@ -652,7 +687,7 @@ useEffect(() => {
             {/* Display message if no results found */}
             {filteredReports.length === 0 && reports.length > 0 && (
               <tr>
-                <td colSpan={10} className="p-5 text-center text-gray-500">
+                <td colSpan={12} className="p-5 text-center text-gray-500">
                   No reports found matching your search term.
                 </td>
               </tr>
@@ -660,13 +695,24 @@ useEffect(() => {
             {/* Display message if reports array is empty */}
             {reports.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-5 text-center text-gray-500">
+                <td colSpan={12} className="p-5 text-center text-gray-500">
                   There are no reports available yet.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-4">
+        <PaginationControls
+          totalItems={filteredReports.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );
