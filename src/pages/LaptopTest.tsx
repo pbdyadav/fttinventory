@@ -72,7 +72,6 @@ type LaptopForm = {
 
 const LaptopTest = () => {
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<LaptopForm>();
-  const [nextMachineCode, setNextMachineCode] = useState<number>(101);
   const [testedBy, setTestedBy] = useState<string>("");
   const [testDate, setTestDate] = useState<string>("");
   const [qrUrl, setQrUrl] = useState<string>("");
@@ -80,40 +79,14 @@ const LaptopTest = () => {
   // ✅ Get user from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-
-  // Fetch next machine code on mount
   useEffect(() => {
-    const fetchNextCode = async () => {
-      const { data, error } = await supabase
-        .from("laptop_tests")
-        .select("MashinCode")
-        .order("MashinCode", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Machine Code fetch error:", error.message);
-        setValue("MashinCode", 101);
-        setNextMachineCode(101);
-        return;
-      }
-
-      const lastCode = Number(data?.MashinCode) || 100;
-      const nextCode = lastCode + 1;
-
-      setNextMachineCode(nextCode);
-      setValue("MashinCode", nextCode);
-    };
-
-    fetchNextCode();
-
     const now = new Date();
     setTestDate(now.toISOString().slice(0, 10));
 
     supabase.auth.getUser().then(({ data }) => {
       setTestedBy(data?.user?.email || "");
     });
-  }, [setValue]);
+  }, []);
 
 
   // ✅ Handle form submit + auto add to inventory
@@ -131,20 +104,25 @@ const LaptopTest = () => {
         return;
       }
 
-      // ✅ Save Laptop Test — add tested_by & tested_on
+      // ✅ Save Laptop Test — add tested_by & tested_on (excluding MashinCode so DB generates it)
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { error } = await supabase.from("laptop_tests").insert([
+      const { MashinCode: _discardedMashinCode, ...insertData } = data;
+
+      const { data: insertedTest, error } = await supabase.from("laptop_tests").insert([
         {
-          ...data,
+          ...insertData,
           tested_by: user?.id ?? null, // ✅ UUID only
           tested_on: new Date().toISOString(),
         },
-      ]);
+      ]).select().single();
 
       if (error) throw error;
+      if (!insertedTest) throw new Error("Failed to retrieve inserted test with MachineCode.");
+
+      const generatedMachineCode = insertedTest.MashinCode;
 
       // ✅ Auto-add to Inventory (if not exists)
       const { data: invExists } = await supabase
@@ -157,7 +135,7 @@ const LaptopTest = () => {
 
       // 2️⃣ Auto-add to Inventory
       const inventoryData = {
-        MashinCode: data.MashinCode,
+        MashinCode: generatedMachineCode,
         Model: data.Model,
         SerialNo: data.SerialNo,
         OS: data.OS,
@@ -177,11 +155,14 @@ const LaptopTest = () => {
       if (invError) throw invError;
 
       // Generate QR URL (client-side service)
-      const payload = encodeURIComponent(JSON.stringify({ ...data, testDate, testedBy }));
+      const payload = encodeURIComponent(JSON.stringify({ ...data, MashinCode: generatedMachineCode, testDate, testedBy }));
       const qr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${payload}`;
       setQrUrl(qr);
 
-      alert(`✅ Laptop test saved and added to inventory! Machine Code: ${data.MashinCode}`);
+      alert(`✅ Laptop test saved and added to inventory! Machine Code: ${generatedMachineCode}`);
+
+      // Update UI with generated machine code
+      setValue("MashinCode", generatedMachineCode);
 
       {/*await supabase.auth.signOut();
 localStorage.removeItem("user");
@@ -195,11 +176,8 @@ window.location.href = "/login"; */}
         window.location.href = "/login";
       }, 2000);
 
-      // Reset form and increment machine code
-      const newCode = (nextMachineCode ?? 100) + 1;
-      setNextMachineCode(newCode);
+      // Reset form but don't fetch new machine code anymore
       reset();
-      setValue("MashinCode", newCode);
     } catch (err: any) {
       alert("❌ Error saving test: " + err.message);
     }
@@ -221,10 +199,10 @@ window.location.href = "/login"; */}
         <h3 className="text-lg font-semibold">Basic Information</h3>
         <div className="grid grid-cols-2 gap-4">
           <input
-            {...register("MashinCode", { required: true })}
+            {...register("MashinCode")}
             readOnly
             className="w-full border p-2 rounded bg-gray-100 text-gray-700"
-            placeholder="Machine Code"
+            placeholder="Auto Generate on Save"
           />
           <input {...register("Model", { required: true })} placeholder="Model" className="w-full border p-2 rounded" />
           <input {...register("SerialNo", { required: true })} placeholder="Serial No." className="w-full border p-2 rounded" />
