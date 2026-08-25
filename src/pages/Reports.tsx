@@ -46,46 +46,46 @@ export default function Reports() {
   const navigate = useNavigate();
 
   // ✅ Restore logged-in user correctly (single source of truth)
-useEffect(() => {
-  const restoreUser = async () => {
-    // 1️⃣ Try localStorage first
-    let stored = JSON.parse(localStorage.getItem("user") || "null");
+  useEffect(() => {
+    const restoreUser = async () => {
+      // 1️⃣ Try localStorage first
+      let stored = JSON.parse(localStorage.getItem("user") || "null");
 
-    // 2️⃣ If missing, fallback to Supabase session
-    if (!stored?.email) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // 2️⃣ If missing, fallback to Supabase session
+      if (!stored?.email) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      const authUser = session?.user;
-      if (!authUser?.email) {
-        toast.error("Session expired. Please login again.");
-        window.location.href = "/login";
-        return;
+        const authUser = session?.user;
+        if (!authUser?.email) {
+          toast.error("Session expired. Please login again.");
+          window.location.href = "/login";
+          return;
+        }
+
+        // 3️⃣ Fetch full profile once
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, email, role, full_name")
+          .eq("id", authUser.id)
+          .single();
+
+        if (error || !data) {
+          toast.error("Unable to load user profile");
+          return;
+        }
+
+        stored = data;
+        localStorage.setItem("user", JSON.stringify(data));
       }
 
-      // 3️⃣ Fetch full profile once
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, role, full_name")
-        .eq("id", authUser.id)
-        .single();
+      // 4️⃣ Set user state
+      setUser(stored);
+    };
 
-      if (error || !data) {
-        toast.error("Unable to load user profile");
-        return;
-      }
-
-      stored = data;
-      localStorage.setItem("user", JSON.stringify(data));
-    }
-
-    // 4️⃣ Set user state
-    setUser(stored);
-  };
-
-  restoreUser();
-}, []);
+    restoreUser();
+  }, []);
 
   const role = user?.role || "";
   const isAdmin = role === "Admin";
@@ -312,15 +312,17 @@ useEffect(() => {
     const qrData = encodeURIComponent(
       JSON.stringify({
         company: "Furtherance Technotree Pvt Ltd, Indore",
+        MashinCode: test.MashinCode,
         SerialNo: test.SerialNo,
         Model: test.Model,
         CPU: test.CPU,
         RAM: test.RAM,
         SSDHdd: test.SSDHdd,
-        testedBy: testerName,
-        testedDate: new Date(testedOn).toLocaleDateString(),
+        touch: test.touch,
+        GraphicCard: test.GraphicCard,
       })
     );
+
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${qrData}`;
     doc.addImage(qrUrl, "PNG", 160, 10, 35, 35);
 
@@ -371,12 +373,15 @@ useEffect(() => {
       // 🔹 Generate QR Data
       const qrData = encodeURIComponent(
         JSON.stringify({
-          company: " ",
+          company: "Furtherance Technotree Pvt Ltd, Indore",
           MashinCode: test.MashinCode,
           SerialNo: test.SerialNo,
           Model: test.Model,
-          testedBy: getTesterName(test.tested_by),
-          testedDate: new Date(test.created_at).toLocaleDateString(),
+          CPU: test.CPU,
+          RAM: test.RAM,
+          SSDHdd: test.SSDHdd,
+          touch: test.touch,
+          GraphicCard: test.GraphicCard,
         })
       );
 
@@ -398,22 +403,34 @@ useEffect(() => {
 
       // 🧩 Add Text (centered and visually balanced)
       const centerX = x + stickerWidth / 2;
-      const textStartY = qrY + qrSize + 4.5; // closer to QR — tight layout
+      const textStartY = qrY + qrSize + 4.5;
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
-      doc.text("Furtherance Technotree Pvt Ltd", centerX, textStartY - 1, { align: "center" });
+
+      doc.text(
+        `FTT | Machine Code: ${test.MashinCode || "-"}`,
+        centerX,
+        textStartY - 1,
+        { align: "center" }
+      );
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.text(`Machine Code: ${test.MashinCode}`, centerX, textStartY + 2.5, { align: "center" });
-      doc.text(`S/N: ${test.SerialNo}`, centerX, textStartY + 5.8, { align: "center" });
 
+      doc.text(
+        `Model: ${test.Model || "-"}`,
+        centerX,
+        textStartY + 2.5,
+        { align: "center" }
+      );
 
-      // Optional: Add model line (if not empty)
-      if (test.model) {
-        doc.text(`${test.model}`, centerX, textStartY + 8.6, { align: "center" });
-      }
+      doc.text(
+        `S/N: ${test.SerialNo || "-"}`,
+        centerX,
+        textStartY + 5.8,
+        { align: "center" }
+      );
 
       count++;
       if (count % stickersPerRow === 0) {
@@ -444,7 +461,7 @@ useEffect(() => {
       .select("*")
       .order("transfer_date", { ascending: false }); // ensures latest comes first
 
-    const isFinanceMode = (mode: string | null | undefined) => 
+    const isFinanceMode = (mode: string | null | undefined) =>
       mode === "finance_card" || mode === "bajaj_card" || mode === "credit_card";
 
     // Map reports to include final/latest transfer data
@@ -553,8 +570,8 @@ useEffect(() => {
               printQRSticker(selectedReports);
             }}
             className={`px-4 py-2 rounded-lg shadow text-white ${selectedReports.length > 0
-                ? "bg-purple-700 hover:bg-purple-800"
-                : "bg-gray-400 cursor-not-allowed"
+              ? "bg-purple-700 hover:bg-purple-800"
+              : "bg-gray-400 cursor-not-allowed"
               }`}
           >
             🖨️ Print Selected QR Stickers
