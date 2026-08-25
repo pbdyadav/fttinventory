@@ -38,7 +38,7 @@ export default function LaptopInventory() {
 
     const { data: laptopsData, error } = await supabase
       .from("laptop_tests")
-      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, GraphicCard, status, created_at")
+      .select("id, MashinCode, SerialNo, Model, CPU, Gen, RAM, SSDHdd, GraphicCard, touch, status, created_at")
       
       .order("created_at", { ascending: false });
 
@@ -300,6 +300,7 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
               <th className="p-3 text-left w-[10%]">RAM</th>
               <th className="p-3 text-left w-[10%]">Storage</th>
               <th className="p-3 text-left w-[10%]">Graphic Card</th>
+              <th className="p-3 text-left w-[10%]">Touch Screen</th>
               <th className="p-3 text-left w-[15%]">Current Location</th>
               <th className="p-3 text-center w-[10%]">Actions</th>
             </tr>
@@ -320,6 +321,7 @@ if (type !== "Sale (Invoice)" && laptop.current_location !== "Main Warehouse" &&
                 <td className="p-3">{laptop.RAM || "-"}</td>
                 <td className="p-3">{laptop.SSDHdd || "-"}</td>
                 <td className="p-3">{laptop.GraphicCard || "-"}</td>
+                <td className="p-3">{laptop.touch || "-"}</td>
                 <td className="p-3 font-medium">
                   {laptop.status === "sold" ? (
                     <span className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded">

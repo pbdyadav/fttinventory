@@ -52,6 +52,7 @@ type LaptopForm = {
   USBRead: boolean;
   USBWrite: boolean;
   PowerChargingPort: boolean;
+  SlowCharging: boolean;
   TypeCPort: boolean;
   APanel: string;
   BPanel: string;
@@ -379,6 +380,7 @@ window.location.href = "/login"; */}
             { key: "USBRead", label: "USB Read" },
             { key: "USBWrite", label: "USB Write" },
             { key: "PowerChargingPort", label: "Power Charging Port" },
+            { key: "SlowCharging", label: "Slow Charging" },
             { key: "TypeCPort", label: "Type-C Port" },
           ].map(({ key, label }) => (
             <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} /> {label}</label>
