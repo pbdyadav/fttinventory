@@ -31,7 +31,7 @@ type LaptopForm = {
 
   batteryhealth: string;
   batteryreading: string;
-
+  BatteryCharging: string;
   battery_1hr: number;
   battery_2hr: number;
   battery_3hr: number;
@@ -52,8 +52,9 @@ type LaptopForm = {
   USBRead: boolean;
   USBWrite: boolean;
   PowerChargingPort: boolean;
-  SlowCharging: boolean;
+ 
   TypeCPort: boolean;
+  SleepMode: boolean;
   APanel: string;
   BPanel: string;
   CPanel: string;
@@ -292,13 +293,13 @@ window.location.href = "/login"; */}
           </select>
           <select {...register("ScreenResolutions")} className="w-full border p-2 rounded">
             <option value="">Types of Screen Resolutions (SD/HD/HDR/FHD)</option>
-            <option>SD"</option>
-            <option>HD"</option>
-            <option>HDR"</option>
-            <option>FHD"</option>
-            <option>2K"</option>
-            <option>4K"</option>
-            <option>Liquid Retina XDR"</option>
+            <option>SD</option>
+            <option>HD</option>
+            <option>HDR</option>
+            <option>FHD</option>
+            <option>2K</option>
+            <option>4K</option>
+            <option>Liquid Retina XDR</option>
           </select>
           <select {...register("GraphicCard")} className="w-full border p-2 rounded">
             <option value="">Graphic Card</option>
@@ -332,6 +333,13 @@ window.location.href = "/login"; */}
         <input {...register("batteryhealth")} placeholder="Battery Health %" className="w-full border p-2 rounded" />
         <input {...register("batteryreading")} placeholder="Battery Reading (mAh) / Cycle Count" className="w-full border p-2 rounded" />
 
+        <select {...register("BatteryCharging")} className="w-full border p-2 rounded">
+            <option value="">Battery Charging (Normal/Slow/No Charging)</option>
+            <option>Normal Charging</option>
+            <option>Slow Charging</option>
+            <option>No Charging</option>
+          </select>
+        
         {/* 🔹 Battery Discharge Test */}
         <h4 className="text-md font-semibold mt-4">
           Battery Discharge Test (After 100%) Restart after one hour.
@@ -380,8 +388,8 @@ window.location.href = "/login"; */}
             { key: "USBRead", label: "USB Read" },
             { key: "USBWrite", label: "USB Write" },
             { key: "PowerChargingPort", label: "Power Charging Port" },
-            { key: "SlowCharging", label: "Slow Charging" },
             { key: "TypeCPort", label: "Type-C Port" },
+            { key: "SleepMode", label: "Sleep Mode Working" },
           ].map(({ key, label }) => (
             <label key={key}><input type="checkbox" {...register(key as keyof LaptopForm)} /> {label}</label>
           ))}
